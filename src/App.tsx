@@ -445,7 +445,7 @@ function App() {
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="value"
-                        label={({ name, percentage }: any) => `${name} ${percentage}%`}
+                        label={({ name, percentage }: { name: string; percentage: string | number }) => `${name} ${percentage}%`}
                       >
                         {sectorData.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
