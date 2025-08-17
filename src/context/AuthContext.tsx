@@ -72,15 +72,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const updated: User = { ...user, profile: { ...user.profile, ...partial } }
       return { ...prev, user: updated }
     })
-  const completeOnboarding = (data: Partial&lt;Profile&gt;) =&gt; {
-    setState((prev) =&gt; {
+  }
+
+  const completeOnboarding = (data: Partial<Profile>) => {
+    setState((prev) => {
       const user = prev.user
       if (!user) return prev
       const updated: User = { ...user, profile: { ...user.profile, ...data, onboarded: true } }
       return { ...prev, user: updated }
     })
-  }
-
   }
 
   const value = useMemo<AuthContextValue>(() => ({

@@ -7,7 +7,6 @@ import { useAuth } from '@/context/AuthContext'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -16,7 +15,7 @@ const schema = z.object({
   experienceLevel: z.enum(['Beginner', 'Intermediate', 'Advanced']),
   goals: z.array(z.enum(['Grow wealth', 'Income', 'Preserve capital', 'Speculative', 'Learn'])).min(1),
   timeHorizon: z.enum(['<1y', '1–3y', '3–5y', '5–10y', '10+']),
-  riskScore: z.coerce.number().int().min(1).max(5),
+  riskScore: z.number().int().min(1).max(5),
   incomeRange: z.enum(['<$50k', '$50k–$100k', '$100k–$250k', '$250k–$1M', '$1M+']).optional(),
   netWorthRange: z.enum(['<$100k', '$100k–$500k', '$500k–$1M', '$1M–$5M', '$5M+']).optional(),
   liquidityNeeds: z.enum(['Low', 'Moderate', 'High']).optional(),
@@ -44,6 +43,7 @@ export default function Onboarding() {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues,
+    values: defaultValues,
   })
 
   const onSubmit = (values: FormValues) => {
@@ -82,7 +82,7 @@ export default function Onboarding() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Experience level</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value ?? undefined}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select experience" />
@@ -109,13 +109,16 @@ export default function Onboarding() {
                       {['Grow wealth', 'Income', 'Preserve capital', 'Speculative', 'Learn'].map((g) => (
                         <div key={g} className="flex items-center space-x-2">
                           <Checkbox
-                            checked={form.watch('goals').includes(g as FormValues['goals'][number])}
+                            checked={(form.watch('goals') ?? []).includes(g as FormValues['goals'][number])}
                             onCheckedChange={(checked) => {
                               const current = form.getValues('goals')
-                              if (checked) {
-                                form.setValue('goals', Array.from(new Set([...current, g as any])))
+                              const goal = g as FormValues['goals'][number]
+                              if (checked === true) {
+                                const next: FormValues['goals'] = Array.from(new Set([...(current ?? []), goal]))
+                                form.setValue('goals', next)
                               } else {
-                                form.setValue('goals', current.filter((x) => x !== g))
+                                const next: FormValues['goals'] = (current ?? []).filter((x) => x !== goal)
+                                form.setValue('goals', next)
                               }
                             }}
                           />
@@ -134,7 +137,7 @@ export default function Onboarding() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Time horizon</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value ?? undefined}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select time horizon" />
@@ -160,8 +163,8 @@ export default function Onboarding() {
                     <RadioGroup
                       className="grid grid-cols-5 gap-2"
                       onValueChange={(v) => field.onChange(Number(v))}
-                      defaultValue={String(field.value)}
-                    >
+                      defaultValue={field.value ? String(field.value) : undefined}>
+                    
                       {[1,2,3,4,5].map((n) => (
                         <div key={n} className="flex items-center space-x-2">
                           <RadioGroupItem value={String(n)} id={`risk-${n}`} />
@@ -183,7 +186,7 @@ export default function Onboarding() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Annual income (optional)</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value ?? undefined}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select range" />
@@ -204,7 +207,7 @@ export default function Onboarding() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Net worth (optional)</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value ?? undefined}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select range" />
@@ -228,7 +231,7 @@ export default function Onboarding() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Liquidity needs (optional)</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value ?? undefined}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select" />
@@ -249,7 +252,7 @@ export default function Onboarding() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Investment knowledge (optional)</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value ?? undefined}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select" />

@@ -252,10 +252,13 @@ export default function Profile() {
                               checked={(form.watch('goals') ?? []).includes(g as NonNullable<FormValues['goals']>[number])}
                               onCheckedChange={(checked) => {
                                 const current = form.getValues('goals') ?? []
-                                if (checked) {
-                                  form.setValue('goals', Array.from(new Set([...current, g as any])))
+                                const goal = g as NonNullable<FormValues['goals']>[number]
+                                if (checked === true) {
+                                  const next: NonNullable<FormValues['goals']> = Array.from(new Set([...current, goal]))
+                                  form.setValue('goals', next)
                                 } else {
-                                  form.setValue('goals', current.filter((x) => x !== g))
+                                  const next: NonNullable<FormValues['goals']> = current.filter((x) => x !== goal)
+                                  form.setValue('goals', next)
                                 }
                               }}
                             />
