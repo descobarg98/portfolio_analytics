@@ -13,17 +13,16 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>({ user: null })
-
-  useEffect(() => {
+  const [state, setState] = useState<AuthState>(() => {
     try {
       const raw = localStorage.getItem(LS_AUTH_KEY)
       if (raw) {
         const parsed: AuthState = JSON.parse(raw)
-        setState(parsed)
+        return parsed
       }
-    } catch { void 0 }
-  }, [])
+    } catch { /* ignore */ }
+    return { user: null }
+  })
 
   useEffect(() => {
     try {
