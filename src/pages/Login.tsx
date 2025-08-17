@@ -42,7 +42,8 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-sm">
-        <CardHeader>
+        <CardHeader className="flex items-center">
+          <img src="/sharpeful-logo.png" alt="Sharpeful" className="h-12 w-auto mb-2" />
           <CardTitle>Welcome to Sharpeful</CardTitle>
           <CardDescription>Sign in to continue</CardDescription>
         </CardHeader>

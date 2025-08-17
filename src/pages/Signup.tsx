@@ -32,7 +32,7 @@ export default function Signup() {
     setError(null)
     try {
       await signup(values.name, values.email, values.password)
-      navigate('/', { replace: true })
+      navigate('/onboarding', { replace: true })
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Failed to create account'
       setError(message)

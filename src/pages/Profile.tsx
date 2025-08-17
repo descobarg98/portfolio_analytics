@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 const schema = z.object({
   name: z.string().min(2),
@@ -16,6 +18,15 @@ const schema = z.object({
   riskTolerance: z.enum(['Low', 'Medium', 'High']).optional(),
   baseCurrency: z.enum(['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD']).optional(),
   timeZone: z.string().optional(),
+
+  experienceLevel: z.enum(['Beginner', 'Intermediate', 'Advanced']).optional(),
+  goals: z.array(z.enum(['Grow wealth', 'Income', 'Preserve capital', 'Speculative', 'Learn'])).optional(),
+  timeHorizon: z.enum(['<1y', '1–3y', '3–5y', '5–10y', '10+']).optional(),
+  riskScore: z.number().int().min(1).max(5).optional(),
+  incomeRange: z.enum(['<$50k', '$50k–$100k', '$100k–$250k', '$250k–$1M', '$1M+']).optional(),
+  netWorthRange: z.enum(['<$100k', '$100k–$500k', '$500k–$1M', '$1M–$5M', '$5M+']).optional(),
+  liquidityNeeds: z.enum(['Low', 'Moderate', 'High']).optional(),
+  knowledge: z.enum(['Novice', 'Intermediate', 'Expert']).optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -30,6 +41,15 @@ export default function Profile() {
     riskTolerance: user?.profile.riskTolerance,
     baseCurrency: user?.profile.baseCurrency ?? 'USD',
     timeZone: user?.profile.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+
+    experienceLevel: user?.profile.experienceLevel,
+    goals: user?.profile.goals ?? [],
+    timeHorizon: user?.profile.timeHorizon,
+    riskScore: user?.profile.riskScore,
+    incomeRange: user?.profile.incomeRange,
+    netWorthRange: user?.profile.netWorthRange,
+    liquidityNeeds: user?.profile.liquidityNeeds,
+    knowledge: user?.profile.knowledge,
   }), [user])
 
   const form = useForm<FormValues>({
@@ -46,6 +66,15 @@ export default function Profile() {
       riskTolerance: values.riskTolerance,
       baseCurrency: values.baseCurrency,
       timeZone: values.timeZone,
+
+      experienceLevel: values.experienceLevel,
+      goals: values.goals,
+      timeHorizon: values.timeHorizon,
+      riskScore: values.riskScore as 1 | 2 | 3 | 4 | 5 | undefined,
+      incomeRange: values.incomeRange,
+      netWorthRange: values.netWorthRange,
+      liquidityNeeds: values.liquidityNeeds,
+      knowledge: values.knowledge,
     })
     setSaved(true)
     setTimeout(() => setSaved(false), 1500)
@@ -61,7 +90,7 @@ export default function Profile() {
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <FormField
                   control={form.control}
                   name="name"
@@ -101,6 +130,7 @@ export default function Profile() {
                     </FormItem>
                   )}
                 />
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
@@ -163,6 +193,194 @@ export default function Profile() {
                     )}
                   />
                 </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="experienceLevel"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Experience level</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Beginner">Beginner</SelectItem>
+                            <SelectItem value="Intermediate">Intermediate</SelectItem>
+                            <SelectItem value="Advanced">Advanced</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="timeHorizon"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Time horizon</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {['<1y', '1–3y', '3–5y', '5–10y', '10+'].map((h) => (
+                              <SelectItem key={h} value={h}>{h}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="goals"
+                  render={() => (
+                    <FormItem>
+                      <FormLabel>Primary goals</FormLabel>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {['Grow wealth', 'Income', 'Preserve capital', 'Speculative', 'Learn'].map((g) => (
+                          <div key={g} className="flex items-center space-x-2">
+                            <Checkbox
+                              checked={(form.watch('goals') ?? []).includes(g as NonNullable<FormValues['goals']>[number])}
+                              onCheckedChange={(checked) => {
+                                const current = form.getValues('goals') ?? []
+                                if (checked) {
+                                  form.setValue('goals', Array.from(new Set([...current, g as any])))
+                                } else {
+                                  form.setValue('goals', current.filter((x) => x !== g))
+                                }
+                              }}
+                            />
+                            <span className="text-sm">{g}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="riskScore"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Risk tolerance (1–5)</FormLabel>
+                      <RadioGroup
+                        className="grid grid-cols-5 gap-2"
+                        onValueChange={(v) => field.onChange(Number(v))}
+                        defaultValue={field.value ? String(field.value) : undefined}
+                      >
+                        {[1,2,3,4,5].map((n) => (
+                          <div key={n} className="flex items-center space-x-2">
+                            <RadioGroupItem value={String(n)} id={`risk-${n}`} />
+                            <label htmlFor={`risk-${n}`} className="text-sm">
+                              {n === 1 ? 'Very Low' : n === 5 ? 'Very High' : n}
+                            </label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="incomeRange"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Annual income (optional)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select range" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {['<$50k', '$50k–$100k', '$100k–$250k', '$250k–$1M', '$1M+'].map((v) => (
+                              <SelectItem key={v} value={v}>{v}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="netWorthRange"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Net worth (optional)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select range" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {['<$100k', '$100k–$500k', '$500k–$1M', '$1M–$5M', '$5M+'].map((v) => (
+                              <SelectItem key={v} value={v}>{v}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="liquidityNeeds"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Liquidity needs (optional)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {['Low', 'Moderate', 'High'].map((v) => (
+                              <SelectItem key={v} value={v}>{v}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="knowledge"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Investment knowledge (optional)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value ?? undefined}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {['Novice', 'Intermediate', 'Expert'].map((v) => (
+                              <SelectItem key={v} value={v}>{v}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
                 <Button type="submit">Save changes</Button>
                 {saved ? <span className="text-sm text-green-600 ml-2">Saved</span> : null}
               </form>

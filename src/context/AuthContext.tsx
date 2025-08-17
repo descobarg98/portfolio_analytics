@@ -8,6 +8,7 @@ type AuthContextValue = {
   signup: (name: string, email: string, password: string) => Promise<void>
   logout: () => void
   updateProfile: (partial: Partial<Profile>) => void
+  completeOnboarding: (data: Partial<Profile>) => void
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -55,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const user: User = {
       id: crypto.randomUUID(),
       email,
-      profile: { name, email },
+      profile: { name, email, onboarded: false },
     }
     setState({ user })
   }
@@ -71,6 +72,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const updated: User = { ...user, profile: { ...user.profile, ...partial } }
       return { ...prev, user: updated }
     })
+  const completeOnboarding = (data: Partial&lt;Profile&gt;) =&gt; {
+    setState((prev) =&gt; {
+      const user = prev.user
+      if (!user) return prev
+      const updated: User = { ...user, profile: { ...user.profile, ...data, onboarded: true } }
+      return { ...prev, user: updated }
+    })
+  }
+
   }
 
   const value = useMemo<AuthContextValue>(() => ({
@@ -79,6 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signup,
     logout,
     updateProfile,
+    completeOnboarding,
   }), [state.user])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
