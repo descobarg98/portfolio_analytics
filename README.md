@@ -51,3 +51,10 @@ export default tseslint.config({
   },
 })
 ```
+## Environments
+
+- Production (deployed on devinapps.com): https://user-login-app-r8dksrgd.devinapps.com
+- Demo account:
+  - Email: demo@sharpeful.com
+  - Password: Demo123!
+- Deployment details and test steps: see DEPLOYMENT.md
