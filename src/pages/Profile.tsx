@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,6 +34,7 @@ type FormValues = z.infer<typeof schema>
 
 export default function Profile() {
   const { user, updateProfile } = useAuth()
+  const navigate = useNavigate()
   const [saved, setSaved] = useState(false)
   const defaults = useMemo<FormValues>(() => ({
     name: user?.profile.name ?? '',
@@ -85,8 +87,15 @@ export default function Profile() {
       <div className="max-w-2xl mx-auto">
         <Card>
           <CardHeader>
-            <CardTitle>Your Profile</CardTitle>
-            <CardDescription>Manage your Sharpeful account information</CardDescription>
+            <div className="flex items-center gap-4">
+              <Button variant="outline" onClick={() => navigate('/')}>
+                ← Back
+              </Button>
+              <div>
+                <CardTitle>Your Profile</CardTitle>
+                <CardDescription>Manage your Sharpeful account information</CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <Form {...form}>
