@@ -5,7 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import './App.css'
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { useAuth } from '@/context/AuthContext'
+import { useNavigate } from 'react-router-dom'
+import '../App.css'
 
 const realHoldings = [
   { symbol: 'IVV', name: 'iShares Core S&P 500 ETF', shares: 5, costBasis: 462.01, currentPrice: 485, sector: 'Large Cap Equity' },
@@ -115,10 +119,12 @@ const performanceData = generatePerformanceData()
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D']
 
-function App() {
+export default function Dashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState('1M')
   const [portfolioData, setPortfolioData] = useState(realHoldings)
   const [transactions, setTransactions] = useState(realTransactions)
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
 
   useEffect(() => {
     const savedPortfolio = localStorage.getItem('portfolioData')
@@ -145,7 +151,7 @@ function App() {
   const totalGainLoss = totalValue - totalCost
   const totalGainLossPercent = ((totalGainLoss / totalCost) * 100)
 
-  const sectorAllocation = portfolioData.reduce((acc, holding) => {
+  const sectorAllocation = portfolioData.reduce((acc: Record<string, number>, holding) => {
     const value = holding.shares * holding.currentPrice
     acc[holding.sector] = (acc[holding.sector] || 0) + value
     return acc
@@ -153,8 +159,8 @@ function App() {
 
   const sectorData = Object.entries(sectorAllocation).map(([sector, value]) => ({
     name: sector,
-    value: value,
-    percentage: ((value / totalValue) * 100).toFixed(1)
+    value: value as number,
+    percentage: (((value as number) / totalValue) * 100).toFixed(1)
   }))
 
   const dailyPL = 1250 + Math.random() * 500 - 250
@@ -170,7 +176,7 @@ function App() {
     return ((point.value - currentData[index - 1].value) / currentData[index - 1].value) * 100
   }).slice(1)
 
-  const riskFreeRate = 2 // 2% annual risk-free rate
+  const riskFreeRate = 2
   const avgReturn = portfolioReturns.reduce((sum, ret) => sum + ret, 0) / portfolioReturns.length
   const returnVariance = portfolioReturns.reduce((sum, ret) => sum + Math.pow(ret - avgReturn, 2), 0) / portfolioReturns.length
   const volatility = Math.sqrt(returnVariance)
@@ -199,18 +205,32 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Sharpeful</h1>
             <p className="text-gray-600">Smart portfolio analytics and performance insights</p>
           </div>
-          <Button onClick={resetData} variant="outline">
-            Reset Demo Data
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={resetData} variant="outline">
+              Reset Demo Data
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Avatar className="cursor-pointer">
+                  <AvatarImage src={user?.profile.avatarUrl} />
+                  <AvatarFallback>{user?.profile.name?.[0]?.toUpperCase() ?? 'U'}</AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>{user?.profile.name ?? user?.email}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate('/profile')}>Profile</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { logout(); navigate('/login', { replace: true }) }}>Logout</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
-        {/* Portfolio Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -269,7 +289,6 @@ function App() {
           </Card>
         </div>
 
-        {/* Performance Chart */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -309,211 +328,151 @@ function App() {
           </CardContent>
         </Card>
 
-        {/* Performance Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Period Return</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${periodReturn >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {periodReturn >= 0 ? '+' : ''}{periodReturn.toFixed(2)}%
               </div>
               <p className="text-xs text-muted-foreground">
-                {selectedPeriod} portfolio performance
+                vs S&P 500: {outperformanceVsSP500 >= 0 ? '+' : ''}{outperformanceVsSP500.toFixed(2)}% | vs NASDAQ: {outperformanceVsNasdaq >= 0 ? '+' : ''}{outperformanceVsNasdaq.toFixed(2)}%
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">vs S&P 500</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Sector Allocation</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${outperformanceVsSP500 >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {outperformanceVsSP500 >= 0 ? '+' : ''}{outperformanceVsSP500.toFixed(2)}%
+              <div className="h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsPieChart>
+                    <Pie
+                      data={sectorData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={60}
+                      fill="#8884d8"
+                      label={({ name, percentage }) => `${name} ${percentage}%`}
+                    >
+                      {sectorData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => [`$${value.toLocaleString()}`, '']} />
+                  </RechartsPieChart>
+                </ResponsiveContainer>
               </div>
-              <p className="text-xs text-muted-foreground">
-                S&P 500: {sp500Return >= 0 ? '+' : ''}{sp500Return.toFixed(2)}%
-              </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="md:col-span-2">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">vs NASDAQ 100</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Portfolio Summary</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${outperformanceVsNasdaq >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {outperformanceVsNasdaq >= 0 ? '+' : ''}{outperformanceVsNasdaq.toFixed(2)}%
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge>Holdings</Badge>
+                  <span className="text-sm text-muted-foreground">{portfolioData.length} assets</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">Total Value</Badge>
+                  <span className="text-sm text-muted-foreground">${Math.round(totalValue).toLocaleString()}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">Gain/Loss</Badge>
+                  <span className={`text-sm ${totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {totalGainLoss >= 0 ? '+' : ''}${Math.round(totalGainLoss).toLocaleString()} ({totalGainLossPercent.toFixed(2)}%)
+                  </span>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                NASDAQ: {nasdaqReturn >= 0 ? '+' : ''}{nasdaqReturn.toFixed(2)}%
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Volatility</CardTitle>
-              <Activity className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
-                {annualizedVolatility.toFixed(2)}%
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Annualized volatility
-              </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Holdings and Analytics */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Holdings Table */}
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Current Holdings</CardTitle>
-                <CardDescription>Your investment positions and performance</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Symbol</TableHead>
-                      <TableHead>Shares</TableHead>
-                      <TableHead>Current Price</TableHead>
-                      <TableHead>Market Value</TableHead>
-                      <TableHead>Gain/Loss</TableHead>
+        <Card>
+          <CardHeader>
+            <CardTitle>Holdings</CardTitle>
+            <CardDescription>Current portfolio positions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Symbol</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="text-right">Shares</TableHead>
+                    <TableHead className="text-right">Cost Basis</TableHead>
+                    <TableHead className="text-right">Current Price</TableHead>
+                    <TableHead className="text-right">Value</TableHead>
+                    <TableHead className="text-right">Sector</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {portfolioData.map((holding) => (
+                    <TableRow key={holding.symbol}>
+                      <TableCell className="font-medium">{holding.symbol}</TableCell>
+                      <TableCell>{holding.name}</TableCell>
+                      <TableCell className="text-right">{holding.shares}</TableCell>
+                      <TableCell className="text-right">${holding.costBasis.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">${holding.currentPrice.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">${Math.round(holding.currentPrice * holding.shares).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">{holding.sector}</TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {portfolioData.map((holding) => {
-                      const marketValue = holding.shares * holding.currentPrice
-                      const costValue = holding.shares * holding.costBasis
-                      const gainLoss = marketValue - costValue
-                      const gainLossPercent = ((gainLoss / costValue) * 100)
-                      
-                      return (
-                        <TableRow key={holding.symbol}>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">{holding.symbol}</div>
-                              <div className="text-sm text-gray-500">{holding.name}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell>{holding.shares}</TableCell>
-                          <TableCell>${holding.currentPrice.toFixed(2)}</TableCell>
-                          <TableCell>${Math.round(marketValue).toLocaleString()}</TableCell>
-                          <TableCell>
-                            <div className={gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}>
-                              {gainLoss >= 0 ? '+' : ''}${Math.round(gainLoss).toLocaleString()}
-                              <div className="text-xs">
-                                ({gainLoss >= 0 ? '+' : ''}{gainLossPercent.toFixed(1)}%)
-                              </div>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sector Allocation */}
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Sector Allocation</CardTitle>
-                <CardDescription>Portfolio distribution by sector</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RechartsPieChart>
-                      <Pie
-                        data={sectorData}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ name, percentage }: { name: string; percentage: string | number }) => `${name} ${percentage}%`}
-                      >
-                        {sectorData.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value: number) => [`$${value.toLocaleString()}`, 'Value']} />
-                    </RechartsPieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="mt-4 space-y-2">
-                  {sectorData.map((sector, index) => (
-                    <div key={sector.name} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                        />
-                        <span className="text-sm">{sector.name}</span>
-                      </div>
-                      <span className="text-sm font-medium">{sector.percentage}%</span>
-                    </div>
                   ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Recent Transactions */}
         <Card>
           <CardHeader>
             <CardTitle>Recent Transactions</CardTitle>
             <CardDescription>Latest portfolio activity</CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Symbol</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Shares</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Total</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transactions.slice(0, 10).map((transaction, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{transaction.date}</TableCell>
-                    <TableCell>{transaction.symbol}</TableCell>
-                    <TableCell>
-                      <Badge variant={transaction.type === 'buy' ? 'default' : 'secondary'}>
-                        {transaction.type.toUpperCase()}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{transaction.shares}</TableCell>
-                    <TableCell>${transaction.price.toFixed(2)}</TableCell>
-                    <TableCell>${Math.round(transaction.shares * transaction.price).toLocaleString()}</TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Symbol</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="text-right">Shares</TableHead>
+                    <TableHead className="text-right">Price</TableHead>
+                    <TableHead className="text-right">Fees</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {transactions.map((tx, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell>{tx.date}</TableCell>
+                      <TableCell>{tx.symbol}</TableCell>
+                      <TableCell>
+                        <Badge variant={tx.type === 'buy' ? 'secondary' : 'destructive'}>
+                          {tx.type.toUpperCase()}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">{tx.shares}</TableCell>
+                      <TableCell className="text-right">${tx.price.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">${tx.fees.toFixed(2)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       </div>
     </div>
   )
 }
-
-export default App
