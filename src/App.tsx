@@ -189,12 +189,6 @@ function App() {
   const outperformanceVsSP500 = periodReturn - sp500Return
   const outperformanceVsNasdaq = periodReturn - nasdaqReturn
 
-  const resetData = () => {
-    setPortfolioData(realHoldings)
-    setTransactions(realTransactions)
-    localStorage.removeItem('portfolioData')
-    localStorage.removeItem('transactions')
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -205,9 +199,6 @@ function App() {
             <h1 className="text-3xl font-bold text-gray-900">Sharpeful</h1>
             <p className="text-gray-600">Smart portfolio analytics and performance insights</p>
           </div>
-          <Button onClick={resetData} variant="outline">
-            Reset Demo Data
-          </Button>
         </div>
 
         {/* Portfolio Overview Cards */}
