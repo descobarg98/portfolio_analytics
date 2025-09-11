@@ -195,12 +195,6 @@ export default function Dashboard() {
   const outperformanceVsSP500 = periodReturn - sp500Return
   const outperformanceVsNasdaq = periodReturn - nasdaqReturn
 
-  const resetData = () => {
-    setPortfolioData(realHoldings)
-    setTransactions(realTransactions)
-    localStorage.removeItem('portfolioData')
-    localStorage.removeItem('transactions')
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -211,9 +205,6 @@ export default function Dashboard() {
             <p className="text-gray-600">Smart portfolio analytics and performance insights</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={resetData} variant="outline">
-              Reset Demo Data
-            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Avatar className="cursor-pointer">
