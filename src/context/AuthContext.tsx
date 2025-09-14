@@ -1,96 +1,168 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { LS_AUTH_KEY, LS_PROFILE_KEY } from '@/constants/auth'
-import type { AuthState, Profile, User } from '@/types/auth'
+import { useAuth0 } from '@auth0/auth0-react'
+import type { Profile, User } from '@/types/auth'
 
 type AuthContextValue = {
   user: User | null
-  login: (email: string, password: string) => Promise<void>
-  signup: (name: string, email: string, password: string) => Promise<void>
+  isLoading: boolean
+  login: () => void
+  signup: () => void
   logout: () => void
-  updateProfile: (partial: Partial<Profile>) => void
-  completeOnboarding: (data: Partial<Profile>) => void
+  updateProfile: (partial: Partial<Profile>) => Promise<void>
+  completeOnboarding: (data: Partial<Profile>) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>(() => {
-    try {
-      const raw = localStorage.getItem(LS_AUTH_KEY)
-      if (raw) {
-        const parsed: AuthState = JSON.parse(raw)
-        return parsed
-      }
-    } catch { /* ignore */ }
-    return { user: null }
-  })
+  const { 
+    user: auth0User, 
+    isAuthenticated, 
+    isLoading: auth0Loading,
+    loginWithRedirect,
+    logout: auth0Logout,
+    getAccessTokenSilently
+  } = useAuth0()
+  
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    try {
-      localStorage.setItem(LS_AUTH_KEY, JSON.stringify(state))
-      if (state.user?.profile) {
-        localStorage.setItem(LS_PROFILE_KEY, JSON.stringify(state.user.profile))
-      }
-    } catch { void 0 }
-  }, [state])
+    const loadUserProfile = async () => {
+      if (isAuthenticated && auth0User) {
+        try {
+          const token = await getAccessTokenSilently()
+          
+          const response = await fetch(`https://${import.meta.env.VITE_AUTH0_DOMAIN}/api/v2/users/${auth0User.sub}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          })
+          
+          let userMetadata: any = {}
+          if (response.ok) {
+            const userData = await response.json()
+            userMetadata = userData.user_metadata || {}
+          }
 
-  const login = async (email: string, password: string) => {
-    if (!email || !password) throw new Error('Invalid credentials')
-    const existingProfileRaw = localStorage.getItem(LS_PROFILE_KEY)
-    let profile: Profile | null = null
-    if (existingProfileRaw) {
-      try {
-        profile = JSON.parse(existingProfileRaw)
-      } catch { void 0 }
+          const profile: Profile = {
+            name: auth0User.name || auth0User.email?.split('@')[0] || 'User',
+            email: auth0User.email || '',
+            avatarUrl: auth0User.picture,
+            onboarded: userMetadata.onboarded || false,
+            ...userMetadata
+          }
+
+          const mappedUser: User = {
+            id: auth0User.sub || '',
+            email: auth0User.email || '',
+            profile
+          }
+
+          setUser(mappedUser)
+        } catch (error) {
+          console.error('Error loading user profile:', error)
+          const profile: Profile = {
+            name: auth0User.name || auth0User.email?.split('@')[0] || 'User',
+            email: auth0User.email || '',
+            avatarUrl: auth0User.picture,
+            onboarded: false
+          }
+
+          const mappedUser: User = {
+            id: auth0User.sub || '',
+            email: auth0User.email || '',
+            profile
+          }
+
+          setUser(mappedUser)
+        }
+      } else {
+        setUser(null)
+      }
+      setIsLoading(false)
     }
-    const user: User = {
-      id: crypto.randomUUID(),
-      email,
-      profile: profile ?? { name: email.split('@')[0] ?? 'User', email },
+
+    if (!auth0Loading) {
+      loadUserProfile()
     }
-    setState({ user })
+  }, [isAuthenticated, auth0User, auth0Loading, getAccessTokenSilently])
+
+  const login = () => {
+    loginWithRedirect()
   }
 
-  const signup = async (name: string, email: string, password: string) => {
-    if (!name || !email || !password) throw new Error('Invalid input')
-    const user: User = {
-      id: crypto.randomUUID(),
-      email,
-      profile: { name, email, onboarded: false },
-    }
-    setState({ user })
+  const signup = () => {
+    loginWithRedirect({
+      authorizationParams: {
+        screen_hint: 'signup'
+      }
+    })
   }
 
   const logout = () => {
-    setState({ user: null })
-  }
-
-  const updateProfile = (partial: Partial<Profile>) => {
-    setState((prev) => {
-      const user = prev.user
-      if (!user) return prev
-      const updated: User = { ...user, profile: { ...user.profile, ...partial } }
-      return { ...prev, user: updated }
+    auth0Logout({
+      logoutParams: {
+        returnTo: window.location.origin
+      }
     })
   }
 
-  const completeOnboarding = (data: Partial<Profile>) => {
-    setState((prev) => {
-      const user = prev.user
-      if (!user) return prev
-      const updated: User = { ...user, profile: { ...user.profile, ...data, onboarded: true } }
-      return { ...prev, user: updated }
-    })
+  const updateUserMetadata = async (metadata: Record<string, any>) => {
+    if (!auth0User?.sub) return
+
+    try {
+      const token = await getAccessTokenSilently()
+      
+      const response = await fetch(`https://${import.meta.env.VITE_AUTH0_DOMAIN}/api/v2/users/${auth0User.sub}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          user_metadata: metadata
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update user metadata')
+      }
+    } catch (error) {
+      console.error('Error updating user metadata:', error)
+      throw error
+    }
+  }
+
+  const updateProfile = async (partial: Partial<Profile>) => {
+    if (!user) return
+
+    const updatedProfile = { ...user.profile, ...partial }
+    const updatedUser = { ...user, profile: updatedProfile }
+    setUser(updatedUser)
+
+    await updateUserMetadata(updatedProfile)
+  }
+
+  const completeOnboarding = async (data: Partial<Profile>) => {
+    if (!user) return
+
+    const updatedProfile = { ...user.profile, ...data, onboarded: true }
+    const updatedUser = { ...user, profile: updatedProfile }
+    setUser(updatedUser)
+
+    await updateUserMetadata(updatedProfile)
   }
 
   const value = useMemo<AuthContextValue>(() => ({
-    user: state.user,
+    user,
+    isLoading: auth0Loading || isLoading,
     login,
     signup,
     logout,
     updateProfile,
     completeOnboarding,
-  }), [state.user])
+  }), [user, auth0Loading, isLoading])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
