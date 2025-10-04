@@ -28,6 +28,7 @@ export default function Onboarding() {
   const { completeOnboarding, user } = useAuth()
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const defaultValues = useMemo<FormValues>(() => ({
     experienceLevel: user?.profile.experienceLevel ?? 'Beginner',
@@ -46,10 +47,11 @@ export default function Onboarding() {
     values: defaultValues,
   })
 
-  const onSubmit = (values: FormValues) => {
+  const onSubmit = async (values: FormValues) => {
     setError(null)
+    setIsSubmitting(true)
     try {
-      completeOnboarding({
+      await completeOnboarding({
         experienceLevel: values.experienceLevel,
         goals: values.goals,
         timeHorizon: values.timeHorizon,
@@ -63,6 +65,8 @@ export default function Onboarding() {
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Failed to complete onboarding'
       setError(message)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -271,7 +275,9 @@ export default function Onboarding() {
 
               {error ? <p className="text-sm text-red-600">{error}</p> : null}
               <div className="flex justify-end">
-                <Button type="submit">Finish</Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? 'Saving...' : 'Finish'}
+                </Button>
               </div>
             </form>
           </Form>
