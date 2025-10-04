@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import logo from '/sharpeful-logo.png'
 
 export default function Login() {
   const { login } = useAuth()
@@ -15,7 +14,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="flex items-center">
-          <img src={logo} alt="Sharpeful" className="h-12 w-auto mb-2" />
+          <img src={`${import.meta.env.BASE_URL}sharpeful-logo.png`} alt="Sharpeful" className="h-12 w-auto mb-2" />
           <CardTitle>Welcome to Sharpeful</CardTitle>
           <CardDescription>Sign in to continue</CardDescription>
         </CardHeader>
