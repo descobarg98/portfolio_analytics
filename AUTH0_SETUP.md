@@ -53,9 +53,11 @@ Update your `.env` file with your Auth0 configuration:
 ```env
 VITE_AUTH0_DOMAIN=your-actual-auth0-domain.auth0.com
 VITE_AUTH0_CLIENT_ID=your-actual-client-id
-VITE_AUTH0_AUDIENCE=your-auth0-api-identifier
+VITE_AUTH0_AUDIENCE=https://your-actual-auth0-domain.auth0.com/api/v2/
 VITE_AUTH0_REDIRECT_URI=http://localhost:5173
 ```
+
+**Important**: The `VITE_AUTH0_AUDIENCE` should be set to your Auth0 Management API identifier, typically `https://YOUR_DOMAIN.auth0.com/api/v2/`. This is required for the application to update user metadata during onboarding.
 
 **Note**: Replace the placeholder values with your actual Auth0 configuration.
 
