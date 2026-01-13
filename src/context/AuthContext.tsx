@@ -31,7 +31,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const loadUserProfile = async () => {
       if (isAuthenticated && auth0User) {
         try {
-          const token = await getAccessTokenSilently()
+          const token = await getAccessTokenSilently({
+            authorizationParams: {
+              audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+              scope: 'openid profile email read:users update:users read:user_metadata update:user_metadata update:current_user_metadata',
+            },
+          })
           
           const response = await fetch(`https://${import.meta.env.VITE_AUTH0_DOMAIN}/api/v2/users/${auth0User.sub}`, {
             headers: {
@@ -112,7 +117,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!auth0User?.sub) return
 
     try {
-      const token = await getAccessTokenSilently()
+      const token = await getAccessTokenSilently({
+        authorizationParams: {
+          audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+          scope: 'openid profile email read:users update:users read:user_metadata update:user_metadata update:current_user_metadata',
+        },
+      })
       
       const response = await fetch(`https://${import.meta.env.VITE_AUTH0_DOMAIN}/api/v2/users/${auth0User.sub}`, {
         method: 'PATCH',

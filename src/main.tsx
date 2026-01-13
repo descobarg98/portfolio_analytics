@@ -8,6 +8,7 @@ const domain = import.meta.env.VITE_AUTH0_DOMAIN
 const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID
 const audience = import.meta.env.VITE_AUTH0_AUDIENCE
 const redirectUri = import.meta.env.VITE_AUTH0_REDIRECT_URI || window.location.origin
+const auth0Scope = 'openid profile email read:users update:users read:user_metadata update:user_metadata update:current_user_metadata'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -16,7 +17,8 @@ createRoot(document.getElementById('root')!).render(
       clientId={clientId}
       authorizationParams={{
         redirect_uri: redirectUri,
-        audience: audience
+        audience: audience,
+        scope: auth0Scope,
       }}
     >
       <AppRouter />

@@ -25,7 +25,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 export default function Onboarding() {
-  const { completeOnboarding, user } = useAuth()
+  const { completeOnboarding, logout, user } = useAuth()
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -74,8 +74,15 @@ export default function Onboarding() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-2xl">
         <CardHeader>
-          <CardTitle>Tell us about your investing</CardTitle>
-          <CardDescription>We’ll personalize Sharpeful to your goals</CardDescription>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle>Tell us about your investing</CardTitle>
+              <CardDescription>We’ll personalize Sharpeful to your goals</CardDescription>
+            </div>
+            <Button variant="outline" onClick={() => { logout(); navigate('/login', { replace: true }) }}>
+              Logout
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <Form {...form}>

@@ -205,6 +205,9 @@ export default function Dashboard() {
             <p className="text-gray-600">Smart portfolio analytics and performance insights</p>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => { logout(); navigate('/login', { replace: true }) }}>
+              Logout
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Avatar className="cursor-pointer">
