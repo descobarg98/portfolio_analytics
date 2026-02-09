@@ -1,0 +1,40 @@
+Portfolio Analytics - Installation & Configuration Guide
+
+Overview
+This document explains how to install and configure the Portfolio Analytics project on Windows, macOS, and Linux.
+
+Prerequisites (All Operating Systems)
+- Node.js (LTS recommended)
+- npm (comes with Node.js)
+- Git (optional, if cloning from GitHub)
+
+Obtain the Code
+Option A: From a ZIP
+1) Extract the ZIP file to a local folder.
+
+Option B: From GitHub (optional)
+1) Clone the repository:
+   git clone <repository-url>
+2) Change into the project directory:
+   cd <project-directory>
+
+Environment Configuration
+Create a file named .env in the project root and add the following values:
+VITE_AUTH0_DOMAIN=dev-13oyn2a5bk3vnp6q.us.auth0.com
+VITE_AUTH0_CLIENT_ID=tycPIChY3ozWjJpvJDoWflNEyWevmMFO
+VITE_AUTH0_AUDIENCE=https://dev-13oyn2a5bk3vnp6q.us.auth0.com/api/v2/
+VITE_AUTH0_REDIRECT_URI=http://localhost:5173
+
+Install Dependencies
+From the project root directory, run:
+   npm install
+
+Run the Application (Development)
+Start the development server:
+   npm run dev
+
+Once running, open your browser and navigate to the local URL printed in the terminal (typically http://localhost:5173).
+
+Notes
+- No additional external services or credentials are required beyond the .env values above.
+- If npm is not recognized, ensure Node.js is installed and your PATH is updated.
