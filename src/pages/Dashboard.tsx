@@ -1,210 +1,556 @@
-import { useState, useEffect } from 'react'
-import { TrendingUp, TrendingDown, DollarSign, Wallet, Activity } from 'lucide-react'
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPieChart, Cell, LineChart, Line, Pie, Legend } from 'recharts'
+import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { DollarSign, Wallet, Activity } from 'lucide-react'
+import { XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart as RechartsPieChart, Cell, AreaChart, Area, Pie, Legend } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/context/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import {
+  PORTFOLIO_OPTIONS,
+  buildHoldingsFromTransactions,
+  getPortfolioInstruments,
+  getPortfolioTransactions,
+  type PortfolioId,
+} from '@/lib/portfolio-data'
+import { fetchHistoricalPrices, fetchLatestPrices } from '@/lib/massive'
 import '../App.css'
 
-const realHoldings = [
-  { symbol: 'IVV', name: 'iShares Core S&P 500 ETF', shares: 5, costBasis: 462.01, currentPrice: 485, sector: 'Large Cap Equity' },
-  { symbol: 'QQQ', name: 'Invesco QQQ Trust ETF', shares: 3, costBasis: 395.31, currentPrice: 420, sector: 'Technology' },
-  { symbol: 'HYG', name: 'iShares iBoxx High Yield Corporate Bond ETF', shares: 4, costBasis: 72.81, currentPrice: 75, sector: 'Fixed Income' },
-  { symbol: 'KRE', name: 'SPDR S&P Regional Banking ETF', shares: 5, costBasis: 44.77, currentPrice: 48, sector: 'Financial' },
-  { symbol: 'XOP', name: 'SPDR S&P Oil & Gas Exploration ETF', shares: 6, costBasis: 132.54, currentPrice: 140, sector: 'Energy' },
-  { symbol: 'VIXY', name: 'ProShares VIX Short-Term Futures ETF', shares: 1, costBasis: 10.19, currentPrice: 12, sector: 'Volatility' },
-  { symbol: 'IWM', name: 'iShares Russell 2000 ETF', shares: 7.5, costBasis: 190.72, currentPrice: 195, sector: 'Small Cap Equity' },
-]
+const COLORS = ['#0B1F3A', '#12325C', '#1A477E', '#235DA0', '#2D74C2', '#3E8BE4', '#5AA1EE', '#7AB6F5', '#9CC9FA', '#B9DBFD']
 
-const realTransactions = [
-  { date: '2024-08-15', symbol: 'IVV', type: 'buy', shares: 1, price: 476.29, fees: 1.99 },
-  { date: '2024-08-12', symbol: 'QQQ', type: 'buy', shares: 2, price: 408.35, fees: 1.99 },
-  { date: '2024-08-10', symbol: 'IVV', type: 'buy', shares: 2, price: 477.58, fees: 1.99 },
-  { date: '2024-08-08', symbol: 'XOP', type: 'buy', shares: 1, price: 133.94, fees: 1.99 },
-  { date: '2024-08-05', symbol: 'IWM', type: 'buy', shares: 0.5, price: 190.72, fees: 1.99 },
-  { date: '2024-08-03', symbol: 'QQQ', type: 'buy', shares: 0.5, price: 351.68, fees: 1.99 },
-  { date: '2024-08-01', symbol: 'IVV', type: 'buy', shares: 1, price: 421.12, fees: 1.99 },
-]
-
-const generatePerformanceData = () => {
-  const now = new Date()
-  
-  return {
-    '1D': Array.from({ length: 8 }, (_, i) => {
-      const time = new Date(now)
-      time.setHours(9, 30 + i * 30, 0, 0)
-      return {
-        time: time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-        value: 125000 + Math.random() * 2000 + i * 200,
-        sp500: 124800 + Math.random() * 1500 + i * 180,
-        nasdaq: 124600 + Math.random() * 1800 + i * 190,
-      }
-    }),
-    '1W': Array.from({ length: 5 }, (_, i) => {
-      const date = new Date(now)
-      date.setDate(date.getDate() - (4 - i))
-      return {
-        time: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        value: 125000 + Math.random() * 3000 + i * 400,
-        sp500: 124500 + Math.random() * 2500 + i * 350,
-        nasdaq: 124300 + Math.random() * 2800 + i * 380,
-      }
-    }),
-    '1M': Array.from({ length: 30 }, (_, i) => {
-      const date = new Date(now)
-      date.setDate(date.getDate() - (29 - i))
-      return {
-        time: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        value: 120000 + Math.random() * 10000 + i * 200,
-        sp500: 119000 + Math.random() * 8000 + i * 180,
-        nasdaq: 118500 + Math.random() * 9000 + i * 190,
-      }
-    }),
-    '6M': Array.from({ length: 26 }, (_, i) => {
-      const date = new Date(now)
-      date.setDate(date.getDate() - (25 - i) * 7)
-      return {
-        time: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        value: 100000 + Math.random() * 15000 + i * 1000,
-        sp500: 98000 + Math.random() * 12000 + i * 900,
-        nasdaq: 97500 + Math.random() * 13000 + i * 950,
-      }
-    }),
-    'YTD': (() => {
-      const startOfYear = new Date(now.getFullYear(), 0, 1)
-      const daysSinceStart = Math.floor((now.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24))
-      const dataPoints = Math.min(Math.max(daysSinceStart, 30), 365)
-      const interval = Math.max(1, Math.floor(daysSinceStart / 50))
-      
-      return Array.from({ length: Math.floor(dataPoints / interval) }, (_, i) => {
-        const date = new Date(startOfYear)
-        date.setDate(date.getDate() + i * interval)
-        return {
-          time: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          value: 90000 + Math.random() * 20000 + i * 800,
-          sp500: 88000 + Math.random() * 18000 + i * 750,
-          nasdaq: 87000 + Math.random() * 19000 + i * 780,
-        }
-      })
-    })(),
-    '1Y': Array.from({ length: 12 }, (_, i) => {
-      const date = new Date(now)
-      date.setMonth(date.getMonth() - (11 - i))
-      return {
-        time: date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-        value: 80000 + Math.random() * 20000 + i * 3500,
-        sp500: 78000 + Math.random() * 18000 + i * 3200,
-        nasdaq: 77000 + Math.random() * 19000 + i * 3350,
-      }
-    }),
-    '5Y': Array.from({ length: 60 }, (_, i) => {
-      const date = new Date(now)
-      date.setMonth(date.getMonth() - (59 - i))
-      return {
-        time: date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-        value: 50000 + Math.random() * 30000 + i * 1200,
-        sp500: 48000 + Math.random() * 25000 + i * 1100,
-        nasdaq: 47000 + Math.random() * 27000 + i * 1150,
-      }
-    }),
-  }
+const PERIOD_OPTIONS = ['1W', '1M', '3M', '6M', '1Y', '3Y', 'YTD'] as const
+const PERIOD_DAYS: Record<(typeof PERIOD_OPTIONS)[number], number> = {
+  '1W': 7,
+  '1M': 30,
+  '3M': 90,
+  '6M': 180,
+  '1Y': 365,
+  '3Y': 365 * 3,
+  'YTD': 0,
 }
 
-const performanceData = generatePerformanceData()
+const toIsoDate = (date: Date) => date.toISOString().slice(0, 10)
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D']
+const buildDefaultRange = () => {
+  const end = new Date()
+  const start = new Date()
+  start.setFullYear(end.getFullYear() - 1)
+  return { start: toIsoDate(start), end: toIsoDate(end) }
+}
+
+const formatCurrency = (value: number) => `$${Math.round(value).toLocaleString()}`
+const formatAxisValue = (value: number) => {
+  const absValue = Math.abs(value)
+  const sign = value < 0 ? '-' : ''
+  if (absValue >= 1_000_000) {
+    return `${sign}$${(absValue / 1_000_000).toFixed(1)}M`
+  }
+  if (absValue >= 1_000) {
+    return `${sign}$${(absValue / 1_000).toFixed(1)}k`
+  }
+  return `${sign}$${Math.round(absValue)}`
+}
+const formatDateLabel = (value: string) =>
+  new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+const formatDateTime = (value: string) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours24 = date.getHours()
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const isPm = hours24 >= 12
+  const hours12 = hours24 % 12 || 12
+  const meridiem = isPm ? 'PM' : 'AM'
+  return `${year}-${month}-${day} ${hours12}:${minutes} ${meridiem}`
+}
+
+const buildPriceMap = (prices: { symbol: string; price: number }[]) => {
+  const map = new Map<string, number>()
+  for (const price of prices) {
+    map.set(price.symbol, price.price)
+  }
+  return map
+}
+
+const buildHistoryMap = (history: { symbol: string; data: { date: string; close: number }[] }[]) => {
+  const map = new Map<string, { date: string; close: number }[]>()
+  for (const entry of history) {
+    map.set(entry.symbol, entry.data)
+  }
+  return map
+}
+
+const buildPortfolioSeries = (
+  historyBySymbol: Map<string, { date: string; close: number }[]>,
+  holdings: { symbol: string; shares: number }[],
+) => {
+  const dateSet = new Set<string>()
+  const priceBySymbolDate = new Map<string, Map<string, number>>()
+
+  for (const holding of holdings) {
+    const series = historyBySymbol.get(holding.symbol) || []
+    const priceMap = new Map<string, number>()
+    for (const point of series) {
+      const date = point.date.slice(0, 10)
+      priceMap.set(date, point.close)
+      dateSet.add(date)
+    }
+    priceBySymbolDate.set(holding.symbol, priceMap)
+  }
+
+  const dates = Array.from(dateSet).sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+  const lastKnown = new Map<string, number>()
+
+  return dates.map((date) => {
+    let total = 0
+    for (const holding of holdings) {
+      const priceMap = priceBySymbolDate.get(holding.symbol)
+      const price = priceMap?.get(date)
+      if (price !== undefined) {
+        lastKnown.set(holding.symbol, price)
+      }
+      const resolved = price ?? lastKnown.get(holding.symbol) ?? 0
+      total += resolved * holding.shares
+    }
+    return { date, value: total }
+  })
+}
+
+const sliceSeriesByPeriod = (series: { date: string; value: number }[], period: (typeof PERIOD_OPTIONS)[number]) => {
+  if (!series.length) return []
+  if (period === 'YTD') {
+    const endDate = new Date(series[series.length - 1].date)
+    const startDate = new Date(endDate.getFullYear(), 0, 1)
+    return series.filter((point) => new Date(point.date) >= startDate)
+  }
+  const days = PERIOD_DAYS[period]
+  const endDate = new Date(series[series.length - 1].date)
+  const startDate = new Date(endDate)
+  startDate.setDate(endDate.getDate() - days)
+  return series.filter((point) => new Date(point.date) >= startDate)
+}
+
+const computeReturn = (series: { value: number }[]) => {
+  if (series.length < 2) return 0
+  const start = series[0].value
+  const end = series[series.length - 1].value
+  if (!start) return 0
+  return ((end - start) / start) * 100
+}
+
+const computeSharpeRatio = (series: { value: number }[], riskFreeRate: number) => {
+  if (series.length < 2) return 0
+  const returns = series.slice(1).map((point, index) => {
+    const prev = series[index].value
+    return prev ? (point.value - prev) / prev : 0
+  })
+  const avg = returns.reduce((sum, value) => sum + value, 0) / returns.length
+  const variance = returns.reduce((sum, value) => sum + Math.pow(value - avg, 2), 0) / returns.length
+  const volatility = Math.sqrt(variance)
+  const annualizedReturn = avg * 252
+  const annualizedVolatility = volatility * Math.sqrt(252)
+  return annualizedVolatility ? (annualizedReturn - riskFreeRate) / annualizedVolatility : 0
+}
+
+const computeSortinoRatio = (series: { value: number }[], riskFreeRate: number) => {
+  if (series.length < 2) return 0
+  const dailyRiskFree = riskFreeRate / 252
+  const excessReturns = series.slice(1).map((point, index) => {
+    const prev = series[index].value
+    const dailyReturn = prev ? (point.value - prev) / prev : 0
+    return dailyReturn - dailyRiskFree
+  })
+  const avgExcess = excessReturns.reduce((sum, value) => sum + value, 0) / excessReturns.length
+  const downsideReturns = excessReturns.map((value) => Math.min(0, value))
+  const downsideVariance = downsideReturns.reduce((sum, value) => sum + value * value, 0) / downsideReturns.length
+  const downsideDeviation = Math.sqrt(downsideVariance) * Math.sqrt(252)
+  const annualizedExcess = avgExcess * 252
+  return downsideDeviation ? annualizedExcess / downsideDeviation : 0
+}
+
+const computeAnnualizedVolatility = (series: { value: number }[]) => {
+  if (series.length < 2) return 0
+  const returns = series.slice(1).map((point, index) => {
+    const prev = series[index].value
+    return prev ? (point.value - prev) / prev : 0
+  })
+  const avg = returns.reduce((sum, value) => sum + value, 0) / returns.length
+  const variance = returns.reduce((sum, value) => sum + Math.pow(value - avg, 2), 0) / returns.length
+  const volatility = Math.sqrt(variance) * Math.sqrt(252)
+  return volatility
+}
+
+const computeMaxDrawdown = (series: { date: string; value: number }[]) => {
+  if (series.length < 2) return { drawdown: 0, peakDate: '', troughDate: '' }
+  let peak = series[0].value
+  let peakDate = series[0].date
+  let maxDrawdown = 0
+  let maxPeakDate = series[0].date
+  let maxTroughDate = series[0].date
+
+  for (const point of series) {
+    if (point.value > peak) {
+      peak = point.value
+      peakDate = point.date
+    }
+    const drawdown = peak ? (point.value - peak) / peak : 0
+    if (drawdown < maxDrawdown) {
+      maxDrawdown = drawdown
+      maxPeakDate = peakDate
+      maxTroughDate = point.date
+    }
+  }
+
+  return { drawdown: maxDrawdown, peakDate: maxPeakDate, troughDate: maxTroughDate }
+}
+const computeBeta = (
+  portfolioSeries: { date: string; value: number }[],
+  benchmarkSeries: { date: string; value: number }[],
+) => {
+  if (portfolioSeries.length < 2 || benchmarkSeries.length < 2) return 0
+  const benchmarkMap = new Map(benchmarkSeries.map((point) => [point.date, point.value]))
+  const matched = portfolioSeries
+    .filter((point) => benchmarkMap.has(point.date))
+    .map((point) => ({
+      date: point.date,
+      portfolio: point.value,
+      benchmark: benchmarkMap.get(point.date) || 0,
+    }))
+
+  if (matched.length < 2) return 0
+
+  const returns = matched.slice(1).map((point, index) => {
+    const prev = matched[index]
+    const portfolioReturn = prev.portfolio ? (point.portfolio - prev.portfolio) / prev.portfolio : 0
+    const benchmarkReturn = prev.benchmark ? (point.benchmark - prev.benchmark) / prev.benchmark : 0
+    return { portfolioReturn, benchmarkReturn }
+  })
+
+  const avgBenchmark = returns.reduce((sum, item) => sum + item.benchmarkReturn, 0) / returns.length
+  const avgPortfolio = returns.reduce((sum, item) => sum + item.portfolioReturn, 0) / returns.length
+
+  let covariance = 0
+  let variance = 0
+  for (const item of returns) {
+    covariance += (item.benchmarkReturn - avgBenchmark) * (item.portfolioReturn - avgPortfolio)
+    variance += Math.pow(item.benchmarkReturn - avgBenchmark, 2)
+  }
+
+  covariance /= returns.length
+  variance /= returns.length
+
+  return variance ? covariance / variance : 0
+}
+
+const computeAlpha = (
+  portfolioSeries: { date: string; value: number }[],
+  benchmarkSeries: { date: string; value: number }[],
+  riskFreeRate: number,
+) => {
+  if (portfolioSeries.length < 2 || benchmarkSeries.length < 2) return 0
+  const benchmarkMap = new Map(benchmarkSeries.map((point) => [point.date, point.value]))
+  const matched = portfolioSeries
+    .filter((point) => benchmarkMap.has(point.date))
+    .map((point) => ({
+      date: point.date,
+      portfolio: point.value,
+      benchmark: benchmarkMap.get(point.date) || 0,
+    }))
+
+  if (matched.length < 2) return 0
+
+  const returns = matched.slice(1).map((point, index) => {
+    const prev = matched[index]
+    const portfolioReturn = prev.portfolio ? (point.portfolio - prev.portfolio) / prev.portfolio : 0
+    const benchmarkReturn = prev.benchmark ? (point.benchmark - prev.benchmark) / prev.benchmark : 0
+    return { portfolioReturn, benchmarkReturn }
+  })
+
+  const avgPortfolio = returns.reduce((sum, item) => sum + item.portfolioReturn, 0) / returns.length
+  const avgBenchmark = returns.reduce((sum, item) => sum + item.benchmarkReturn, 0) / returns.length
+
+  const annualPortfolio = avgPortfolio * 252
+  const annualBenchmark = avgBenchmark * 252
+  const beta = computeBeta(portfolioSeries, benchmarkSeries)
+  return annualPortfolio - (riskFreeRate + beta * (annualBenchmark - riskFreeRate))
+}
+const resolveCloseForDate = (series: { date: string; close: number }[], targetDate: string) => {
+  if (!series.length) return 0
+  const sorted = [...series].sort((a, b) => a.date.localeCompare(b.date))
+  let lastClose: number | null = null
+  for (const point of sorted) {
+    if (point.date <= targetDate) {
+      lastClose = point.close
+    } else {
+      break
+    }
+  }
+  return lastClose ?? 0
+}
 
 export default function Dashboard() {
-  const [selectedPeriod, setSelectedPeriod] = useState('1M')
-  const [portfolioData, setPortfolioData] = useState(realHoldings)
-  const [transactions, setTransactions] = useState(realTransactions)
+  const [selectedPeriod, setSelectedPeriod] = useState<(typeof PERIOD_OPTIONS)[number]>('1M')
+  const [selectedPortfolio, setSelectedPortfolio] = useState<PortfolioId | null>(null)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
-  useEffect(() => {
-    const savedPortfolio = localStorage.getItem('portfolioData')
-    const savedTransactions = localStorage.getItem('transactions')
-    
-    if (savedPortfolio) {
-      setPortfolioData(JSON.parse(savedPortfolio))
-    }
-    if (savedTransactions) {
-      setTransactions(JSON.parse(savedTransactions))
-    }
-  }, [])
+  const transactions = useMemo(
+    () => (selectedPortfolio ? getPortfolioTransactions(selectedPortfolio) : []),
+    [selectedPortfolio],
+  )
 
-  useEffect(() => {
-    localStorage.setItem('portfolioData', JSON.stringify(portfolioData))
-  }, [portfolioData])
+  const instruments = useMemo(
+    () => (selectedPortfolio ? getPortfolioInstruments(selectedPortfolio) : []),
+    [selectedPortfolio],
+  )
 
-  useEffect(() => {
-    localStorage.setItem('transactions', JSON.stringify(transactions))
+  const symbols = useMemo(() => {
+    const set = new Set(instruments.map((item) => item.symbol))
+    set.add('SPY')
+    set.add('QQQ')
+    set.add('DIA')
+    return Array.from(set)
+  }, [instruments])
+
+  const dateRange = useMemo(() => {
+    if (!transactions.length) return buildDefaultRange()
+    const timestamps = transactions.map((tx) => new Date(tx.date).getTime())
+    const minDate = new Date(Math.min(...timestamps))
+    const endDate = new Date()
+    return { start: toIsoDate(minDate), end: toIsoDate(endDate) }
   }, [transactions])
 
-  const totalValue = portfolioData.reduce((sum, holding) => sum + (holding.shares * holding.currentPrice), 0)
-  const totalCost = portfolioData.reduce((sum, holding) => sum + (holding.shares * holding.costBasis), 0)
+  const latestPricesQuery = useQuery({
+    queryKey: ['massive', 'latest', symbols],
+    queryFn: () => fetchLatestPrices(symbols),
+    enabled: Boolean(selectedPortfolio) && symbols.length > 0,
+    staleTime: 1000 * 60 * 5,
+    refetchInterval: 1000 * 60 * 5,
+  })
+
+  const historyQuery = useQuery({
+    queryKey: ['massive', 'history', symbols, dateRange.start, dateRange.end],
+    queryFn: async () => {
+      const results = await Promise.all(
+        symbols.map(async (symbol) => ({
+          symbol,
+          data: await fetchHistoricalPrices(symbol, dateRange.start, dateRange.end),
+        })),
+      )
+      return results
+    },
+    enabled: Boolean(selectedPortfolio) && symbols.length > 0,
+    staleTime: 1000 * 60 * 30,
+  })
+
+  const latestPriceMap = useMemo(
+    () => buildPriceMap(latestPricesQuery.data ?? []),
+    [latestPricesQuery.data],
+  )
+
+  const historyMap = useMemo(
+    () => buildHistoryMap(historyQuery.data ?? []),
+    [historyQuery.data],
+  )
+
+  const enrichedTransactions = useMemo(() => {
+    if (!selectedPortfolio) return []
+    return transactions.map((tx) => {
+      const series = historyMap.get(tx.symbol) || []
+      const resolvedPrice = resolveCloseForDate(series, tx.date)
+      return { ...tx, price: resolvedPrice }
+    })
+  }, [selectedPortfolio, transactions, historyMap])
+
+  const holdings = useMemo(() => {
+    if (!selectedPortfolio) return []
+    const baseHoldings = buildHoldingsFromTransactions(enrichedTransactions, instruments)
+    return baseHoldings.map((holding) => {
+      const currentPrice = latestPriceMap.get(holding.symbol) ?? 0
+      return {
+        ...holding,
+        currentPrice,
+        value: currentPrice * holding.shares,
+      }
+    })
+  }, [selectedPortfolio, enrichedTransactions, instruments, latestPriceMap])
+
+  const sortedHoldings = useMemo(() => {
+    return [...holdings].sort((a, b) => {
+      const aCost = a.costBasis * a.shares
+      const bCost = b.costBasis * b.shares
+      const aPct = aCost ? (a.value - aCost) / aCost : 0
+      const bPct = bCost ? (b.value - bCost) / bCost : 0
+      return bPct - aPct
+    })
+  }, [holdings])
+
+  const topHoldings = useMemo(() => {
+    return [...holdings]
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 3)
+  }, [holdings])
+
+  const totalValue = holdings.reduce((sum, holding) => sum + holding.value, 0)
+  const totalCost = holdings.reduce((sum, holding) => sum + holding.shares * holding.costBasis, 0)
   const totalGainLoss = totalValue - totalCost
-  const totalGainLossPercent = ((totalGainLoss / totalCost) * 100)
+  const totalGainLossPercent = totalCost ? (totalGainLoss / totalCost) * 100 : 0
 
-  const sectorAllocation = portfolioData.reduce((acc: Record<string, number>, holding) => {
-    const value = holding.shares * holding.currentPrice
-    acc[holding.sector] = (acc[holding.sector] || 0) + value
+  const sectorAllocation = holdings.reduce((acc: Record<string, number>, holding) => {
+    acc[holding.sector] = (acc[holding.sector] || 0) + holding.value
     return acc
-  }, {} as Record<string, number>)
+  }, {})
 
-  const sectorData = Object.entries(sectorAllocation).map(([sector, value]) => ({
-    name: sector,
-    value: value as number,
-    percentage: (((value as number) / totalValue) * 100).toFixed(1)
-  }))
+  const sectorData = useMemo(() => {
+    const entries = Object.entries(sectorAllocation)
+      .map(([sector, value]) => ({
+        name: sector,
+        value,
+        percentage: totalValue ? ((value / totalValue) * 100).toFixed(1) : '0.0',
+      }))
+      .sort((a, b) => b.value - a.value)
 
-  const dailyPL = 1250 + Math.random() * 500 - 250
-  const dailyPLPercent = (dailyPL / totalValue) * 100
+    if (entries.length <= 9) return entries
 
-  const currentData = performanceData[selectedPeriod as keyof typeof performanceData]
-  const startValue = currentData[0]?.value || 0
-  const endValue = currentData[currentData.length - 1]?.value || 0
-  const periodReturn = ((endValue - startValue) / startValue) * 100
+    const top = entries.slice(0, 9)
+    const rest = entries.slice(9)
+    const otherValue = rest.reduce((sum, entry) => sum + entry.value, 0)
+    const otherPercent = totalValue ? ((otherValue / totalValue) * 100).toFixed(1) : '0.0'
+    return [...top, { name: 'Other', value: otherValue, percentage: otherPercent }]
+  }, [sectorAllocation, totalValue])
 
-  const portfolioReturns = currentData.map((point, index) => {
-    if (index === 0) return 0
-    return ((point.value - currentData[index - 1].value) / currentData[index - 1].value) * 100
-  }).slice(1)
+  const portfolioHistory = useMemo(() => {
+    if (!selectedPortfolio || !holdings.length) return []
+    return buildPortfolioSeries(historyMap, holdings)
+  }, [selectedPortfolio, holdings, historyMap])
 
-  const riskFreeRate = 2
-  const avgReturn = portfolioReturns.reduce((sum, ret) => sum + ret, 0) / portfolioReturns.length
-  const returnVariance = portfolioReturns.reduce((sum, ret) => sum + Math.pow(ret - avgReturn, 2), 0) / portfolioReturns.length
-  const volatility = Math.sqrt(returnVariance)
-  const annualizedReturn = avgReturn * (selectedPeriod === '1D' ? 252 : selectedPeriod === '1W' ? 52 : selectedPeriod === '1M' ? 12 : selectedPeriod === '6M' ? 2 : 1)
-  const annualizedVolatility = volatility * Math.sqrt(selectedPeriod === '1D' ? 252 : selectedPeriod === '1W' ? 52 : selectedPeriod === '1M' ? 12 : selectedPeriod === '6M' ? 2 : 1)
-  const sharpeRatio = annualizedVolatility > 0 ? (annualizedReturn - riskFreeRate) / annualizedVolatility : 0
+  const benchmarkSeries = useMemo(() => {
+    const map = new Map<string, { date: string; value: number }[]>()
+    for (const symbol of ['SPY', 'QQQ', 'DIA']) {
+      const series = historyMap.get(symbol) || []
+      map.set(
+        symbol,
+        series.map((point) => ({ date: point.date.slice(0, 10), value: point.close })),
+      )
+    }
+    return map
+  }, [historyMap])
 
-  const sp500Start = currentData[0]?.sp500 || 0
-  const sp500End = currentData[currentData.length - 1]?.sp500 || 0
-  const sp500Return = ((sp500End - sp500Start) / sp500Start) * 100
+  const filteredPortfolioSeries = useMemo(
+    () => sliceSeriesByPeriod(portfolioHistory, selectedPeriod),
+    [portfolioHistory, selectedPeriod],
+  )
 
-  const nasdaqStart = currentData[0]?.nasdaq || 0
-  const nasdaqEnd = currentData[currentData.length - 1]?.nasdaq || 0
-  const nasdaqReturn = ((nasdaqEnd - nasdaqStart) / nasdaqStart) * 100
+  const yAxisDomain = useMemo(() => {
+    if (!filteredPortfolioSeries.length) return ['auto', 'auto'] as const
+    const values = filteredPortfolioSeries.map((point) => point.value)
+    const min = Math.min(...values)
+    const max = Math.max(...values)
+    const padding = (max - min) * 0.1
+    return [Math.max(0, min - padding), max + padding] as const
+  }, [filteredPortfolioSeries])
 
-  const outperformanceVsSP500 = periodReturn - sp500Return
-  const outperformanceVsNasdaq = periodReturn - nasdaqReturn
+  const xAxisTicks = useMemo(() => {
+    if (filteredPortfolioSeries.length < 3) {
+      return filteredPortfolioSeries.map((point) => point.date)
+    }
+    const first = filteredPortfolioSeries[0].date
+    const last = filteredPortfolioSeries[filteredPortfolioSeries.length - 1].date
+    const middle = filteredPortfolioSeries[Math.floor(filteredPortfolioSeries.length / 2)].date
+    return [first, middle, last]
+  }, [filteredPortfolioSeries])
 
+  const portfolioPeriodReturn = useMemo(() => {
+    if (filteredPortfolioSeries.length < 2) {
+      return { dollar: 0, percent: 0 }
+    }
+    const startValue = filteredPortfolioSeries[0].value
+    const endValue = filteredPortfolioSeries[filteredPortfolioSeries.length - 1].value
+    const dollar = endValue - startValue
+    const percent = startValue ? (dollar / startValue) * 100 : 0
+    return { dollar, percent }
+  }, [filteredPortfolioSeries])
+
+  const filteredSp500Series = useMemo(
+    () => sliceSeriesByPeriod(benchmarkSeries.get('SPY') || [], selectedPeriod),
+    [benchmarkSeries, selectedPeriod],
+  )
+
+  const filteredNasdaqSeries = useMemo(
+    () => sliceSeriesByPeriod(benchmarkSeries.get('QQQ') || [], selectedPeriod),
+    [benchmarkSeries, selectedPeriod],
+  )
+
+  const filteredDjiSeries = useMemo(
+    () => sliceSeriesByPeriod(benchmarkSeries.get('DIA') || [], selectedPeriod),
+    [benchmarkSeries, selectedPeriod],
+  )
+
+  const sp500Return = computeReturn(filteredSp500Series)
+  const nasdaqReturn = computeReturn(filteredNasdaqSeries)
+  const djiReturn = computeReturn(filteredDjiSeries)
+
+  const performanceMessage = useMemo(() => {
+    if (!filteredPortfolioSeries.length) return 'Underperformed'
+    return portfolioPeriodReturn.percent >= sp500Return ? 'Beat' : 'Underperformed'
+  }, [filteredPortfolioSeries, portfolioPeriodReturn.percent, sp500Return])
+
+  const riskFreeRate = 0.04
+  const sharpeRatio = computeSharpeRatio(portfolioHistory, riskFreeRate)
+  const sortinoRatio = computeSortinoRatio(portfolioHistory, riskFreeRate)
+  const betaVsSp500 = computeBeta(filteredPortfolioSeries, filteredSp500Series)
+  const alphaVsSp500 = computeAlpha(filteredPortfolioSeries, filteredSp500Series, riskFreeRate)
+  const portfolioVolatility = computeAnnualizedVolatility(portfolioHistory)
+  const maxDrawdown = computeMaxDrawdown(portfolioHistory)
+
+  const recentTransactions = useMemo(
+    () => [...enrichedTransactions].sort((a, b) => new Date(b.datetime).getTime() - new Date(a.datetime).getTime()),
+    [enrichedTransactions],
+  )
+
+  const showSkeletons = !selectedPortfolio || latestPricesQuery.isLoading || historyQuery.isLoading
+  const pricingError = latestPricesQuery.error || historyQuery.error
+
+  const handlePortfolioSelect = (portfolioId: PortfolioId) => {
+    setSelectedPortfolio(portfolioId)
+    setIsDialogOpen(false)
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4 dark">
+      <TooltipProvider>
+        <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Sharpeful</h1>
-            <p className="text-gray-600">Smart portfolio analytics and performance insights</p>
+          <div className="flex items-center gap-3">
+            <img
+              src={`${import.meta.env.BASE_URL}sharpeful-logo.png`}
+              alt="Sharpeful"
+              className="h-20 w-20"
+            />
+            <div>
+              <h1 className="text-3xl font-bold text-blue-100">Sharpeful</h1>
+              <p className="text-zinc-400">Portfolio analytics & insights</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
+            {selectedPortfolio ? (
+              <Badge variant="secondary">
+                {PORTFOLIO_OPTIONS.find((option) => option.id === selectedPortfolio)?.name}
+              </Badge>
+            ) : null}
+            <Button variant="outline" onClick={() => setIsDialogOpen(true)}>
+              Connect Brokerage Account
+            </Button>
             <Button variant="outline" onClick={() => { logout(); navigate('/login', { replace: true }) }}>
               Logout
             </Button>
@@ -225,76 +571,275 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
+        {pricingError && (
+          <div className="text-sm text-red-600">
+            Pricing data is unavailable. Check your Massive API settings.
+          </div>
+        )}
+
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Select a portfolio</DialogTitle>
+              <DialogDescription>
+                Choose a portfolio to load
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-3">
+              {PORTFOLIO_OPTIONS.map((option) => (
+                <Button
+                  key={option.id}
+                  variant="outline"
+                  className="justify-between"
+                  onClick={() => handlePortfolioSelect(option.id)}
+                >
+                  <span>{option.name}</span>
+                  <span className="text-xs text-zinc-400">Load data</span>
+                </Button>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card className="lg:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Portfolio Value</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Portfolio Value</CardTitle>
+              <DollarSign className="h-4 w-4 text-blue-300" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${Math.round(totalValue).toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">
-                +${Math.abs(totalGainLoss).toLocaleString()} ({totalGainLossPercent.toFixed(2)}%)
-              </p>
+              {showSkeletons ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-7 w-32" />
+                  <Skeleton className="h-4 w-40" />
+                </div>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">{formatCurrency(totalValue)}</div>
+                  <p className={`text-base font-semibold ${portfolioPeriodReturn.dollar >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {portfolioPeriodReturn.dollar >= 0 ? '+' : ''}{formatCurrency(Math.abs(portfolioPeriodReturn.dollar))} ({portfolioPeriodReturn.percent.toFixed(2)}%)
+                  </p>
+                </>
+              )}
             </CardContent>
-          </Card>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              Sum of current holdings value using latest Massive prices.
+            </TooltipContent>
+          </Tooltip>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Daily P&L</CardTitle>
-              {dailyPL >= 0 ? <TrendingUp className="h-4 w-4 text-green-600" /> : <TrendingDown className="h-4 w-4 text-red-600" />}
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${dailyPL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {dailyPL >= 0 ? '+' : ''}${Math.round(dailyPL).toLocaleString()}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {dailyPL >= 0 ? '+' : ''}{dailyPLPercent.toFixed(2)}% today
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Holdings</CardTitle>
-              <Wallet className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{portfolioData.length}</div>
-              <p className="text-xs text-muted-foreground">
-                {sectorData.length} sectors
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card className="lg:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Sharpe Ratio</CardTitle>
-              <Activity className="h-4 w-4 text-muted-foreground" />
+              <Activity className="h-4 w-4 text-blue-300" />
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${sharpeRatio >= 1 ? 'text-green-600' : sharpeRatio >= 0.5 ? 'text-yellow-600' : 'text-red-600'}`}>
-                {sharpeRatio.toFixed(2)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Risk-adjusted return
-              </p>
+              {showSkeletons ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-7 w-20" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+              ) : (
+                <>
+                  <div className={`text-2xl font-bold ${sharpeRatio >= 1 ? 'text-green-600' : sharpeRatio >= 0.5 ? 'text-yellow-600' : 'text-red-600'}`}>
+                    {sharpeRatio.toFixed(2)}
+                  </div>
+                  <p className="text-xs text-zinc-400">
+                    Risk-adjusted return
+                  </p>
+                </>
+              )}
             </CardContent>
-          </Card>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              Risk-adjusted return using daily portfolio returns and 4% risk-free rate.
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card className="lg:col-span-1">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Sortino Ratio</CardTitle>
+              <Activity className="h-4 w-4 text-blue-300" />
+            </CardHeader>
+            <CardContent>
+              {showSkeletons ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-7 w-20" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+              ) : (
+                <>
+                  <div className={`text-2xl font-bold ${sortinoRatio >= 1 ? 'text-green-600' : sortinoRatio >= 0.5 ? 'text-yellow-600' : 'text-red-600'}`}>
+                    {sortinoRatio.toFixed(2)}
+                  </div>
+                  <p className="text-xs text-zinc-400">
+                    Downside risk-adjusted return
+                  </p>
+                </>
+              )}
+            </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              Return versus downside volatility using a 4% risk-free rate.
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card className="lg:col-span-1">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Beta</CardTitle>
+              <Activity className="h-4 w-4 text-blue-300" />
+            </CardHeader>
+            <CardContent>
+              {showSkeletons ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-7 w-20" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-zinc-100">
+                    {betaVsSp500.toFixed(2)}
+                  </div>
+                  <p className="text-xs text-zinc-400">
+                    Sensitivity to benchmark
+                  </p>
+                </>
+              )}
+            </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              Sensitivity of portfolio returns versus SPY in the selected period.
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card className="lg:col-span-1">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Alpha</CardTitle>
+              <Activity className="h-4 w-4 text-blue-300" />
+            </CardHeader>
+            <CardContent>
+              {showSkeletons ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-7 w-20" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+              ) : (
+                <>
+                  <div className={`text-2xl font-bold ${alphaVsSp500 >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {alphaVsSp500 >= 0 ? '+' : ''}{(alphaVsSp500 * 100).toFixed(2)}%
+                  </div>
+                  <p className="text-xs text-zinc-400">
+                    Annualized excess return vs SPY
+                  </p>
+                </>
+              )}
+            </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              Alpha based on annualized returns and beta versus SPY.
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card className="lg:col-span-1">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Performance</CardTitle>
+              <Activity className="h-4 w-4 text-blue-300" />
+            </CardHeader>
+            <CardContent>
+              {showSkeletons ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-7 w-40" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+              ) : (
+                <>
+                  <div className={`text-lg font-semibold ${portfolioPeriodReturn.percent >= sp500Return ? 'text-green-600' : 'text-red-600'}`}>
+                    {performanceMessage}
+                  </div>
+                  <p className="text-xs text-zinc-400">
+                    Based on the selected period return.
+                  </p>
+                </>
+              )}
+            </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              Compares portfolio return to SPY over the selected period.
+            </TooltipContent>
+          </Tooltip>
         </div>
 
-        <Card>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Card>
+          <CardContent className="py-3">
+            {showSkeletons ? (
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-6 w-48" />
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm font-semibold text-zinc-100">
+                  S&P 500:{' '}
+                  <span className={sp500Return >= 0 ? 'text-green-600' : 'text-red-600'}>
+                    {sp500Return >= 0 ? '+' : ''}{sp500Return.toFixed(2)}%
+                  </span>
+                </div>
+                <div className="text-sm font-semibold text-zinc-100">
+                  NASDAQ 100:{' '}
+                  <span className={nasdaqReturn >= 0 ? 'text-green-600' : 'text-red-600'}>
+                    {nasdaqReturn >= 0 ? '+' : ''}{nasdaqReturn.toFixed(2)}%
+                  </span>
+                </div>
+                <div className="text-sm font-semibold text-zinc-100">
+                  DJI:{' '}
+                  <span className={djiReturn >= 0 ? 'text-green-600' : 'text-red-600'}>
+                    {djiReturn >= 0 ? '+' : ''}{djiReturn.toFixed(2)}%
+                  </span>
+                </div>
+              </div>
+            )}
+          </CardContent>
+            </Card>
+          </TooltipTrigger>
+          <TooltipContent>
+            Benchmark returns for SPY, QQQ, and DIA over the selected period.
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Portfolio Performance vs Benchmarks</CardTitle>
-                <CardDescription>Portfolio value vs S&P 500 and NASDAQ 100 over time</CardDescription>
+                <CardTitle>Portfolio Performance</CardTitle>
               </div>
               <div className="flex space-x-2">
-                {Object.keys(performanceData).map((period) => (
+                {PERIOD_OPTIONS.map((period) => (
                   <Button
                     key={period}
-                    variant={selectedPeriod === period ? "default" : "outline"}
+                    variant={selectedPeriod === period ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setSelectedPeriod(period)}
                   >
@@ -306,92 +851,241 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={currentData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="time" />
-                  <YAxis tickFormatter={(value) => `$${value.toLocaleString()}`} />
-                  <Tooltip formatter={(value: number) => [`$${value.toLocaleString()}`, '']} />
-                  <Legend />
-                  <Line type="monotone" dataKey="nasdaq" stroke="#FF8042" strokeWidth={2} name="NASDAQ 100" />
-                  <Line type="monotone" dataKey="sp500" stroke="#8884d8" strokeWidth={2} name="S&P 500" />
-                  <Line type="monotone" dataKey="value" stroke="#82ca9d" strokeWidth={2} name="Portfolio" />
-                </LineChart>
-              </ResponsiveContainer>
+              {showSkeletons ? (
+                <Skeleton className="h-full w-full" />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={filteredPortfolioSeries} margin={{ top: 24, right: 24, left: 8, bottom: 12 }}>
+                    <XAxis
+                      dataKey="date"
+                      ticks={xAxisTicks}
+                      interval={0}
+                      tickFormatter={formatDateLabel}
+                      tickMargin={14}
+                      tick={(props) => {
+                        const { x, y, payload } = props
+                        const index = xAxisTicks.indexOf(String(payload?.value))
+                        const textAnchor = index === 0 ? 'start' : index === 1 ? 'middle' : 'end'
+                        return (
+                          <text x={x} y={y} dy={16} textAnchor={textAnchor} fill="#94a3b8">
+                            {formatDateLabel(String(payload?.value))}
+                          </text>
+                        )
+                      }}
+                    />
+                    <YAxis
+                      domain={yAxisDomain}
+                      tickFormatter={(value) => formatAxisValue(Number(value))}
+                      orientation="right"
+                      width={90}
+                      tickMargin={14}
+                    />
+                    <RechartsTooltip
+                      formatter={(value: number) => [`$${Math.round(value).toLocaleString()}`, '']}
+                      labelFormatter={(label) => formatDateLabel(String(label))}
+                      separator=""
+                      contentStyle={{ borderRadius: '8px', opacity: 0.9, backgroundColor: '#000000', padding: '4px 6px', border: 'none' }}
+                      itemStyle={{ fontSize: 14, fontWeight: 600, color: '#ffffff', margin: 0, padding: 0 }}
+                      labelStyle={{ fontSize: 10, display: 'block', marginBottom: 2, color: '#ffffff' }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#ffffff"
+                      fill="#122740"
+                      fillOpacity={1}
+                      strokeWidth={2}
+                      name="Portfolio"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
-        </Card>
+            </Card>
+          </TooltipTrigger>
+          <TooltipContent>
+            Portfolio value time series from Massive daily closes.
+          </TooltipContent>
+        </Tooltip>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Period Return</CardTitle>
+              <CardTitle className="text-sm font-medium">Holdings Summary</CardTitle>
+              <Wallet className="h-4 w-4 text-blue-300" />
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${periodReturn >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {periodReturn >= 0 ? '+' : ''}{periodReturn.toFixed(2)}%
-              </div>
-              <p className="text-xs text-muted-foreground">
-                vs S&P 500: {outperformanceVsSP500 >= 0 ? '+' : ''}{outperformanceVsSP500.toFixed(2)}% | vs NASDAQ: {outperformanceVsNasdaq >= 0 ? '+' : ''}{outperformanceVsNasdaq.toFixed(2)}%
-              </p>
+              {showSkeletons ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-4 w-36" />
+                </div>
+              ) : (
+                <>
+                  <div className="text-sm text-zinc-100">
+                    Total Holdings: <span className="font-semibold">{holdings.length}</span>
+                  </div>
+                  <div className="text-sm text-zinc-100">
+                    Sectors: <span className="font-semibold">{sectorData.length}</span>
+                  </div>
+                  <div className="text-sm text-zinc-100">
+                    Top Holdings:
+                    {topHoldings.length ? (
+                      <div className="mt-1 font-semibold">
+                        {topHoldings
+                          .map((holding) => {
+                            const percent = totalValue > 0 ? Math.round((holding.value / totalValue) * 100) : 0
+                            return `${holding.symbol} ${percent}%`
+                          })
+                          .map((label, index) => (
+                            <div key={label} className="text-zinc-100 ml-3">
+                              {index + 1}. {label}
+                            </div>
+                          ))}
+                      </div>
+                    ) : (
+                      <div className="font-semibold">—</div>
+                    )}
+                  </div>
+                </>
+              )}
             </CardContent>
-          </Card>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              Summary of holdings count, sector count, and largest position.
+            </TooltipContent>
+          </Tooltip>
 
-          <Card>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Sector Allocation</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsPieChart>
-                    <Pie
-                      data={sectorData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={60}
-                      fill="#8884d8"
-                      label={({ name, percentage }) => `${name} ${percentage}%`}
-                    >
-                      {sectorData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value: number) => [`$${value.toLocaleString()}`, '']} />
-                  </RechartsPieChart>
-                </ResponsiveContainer>
-              </div>
+              {showSkeletons ? (
+                <Skeleton className="h-40 w-full" />
+              ) : (
+                <div className="h-36">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsPieChart>
+                      <Pie
+                        data={sectorData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={60}
+                        fill="#8884d8"
+                      >
+                        {sectorData.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip
+                        formatter={(_value: number, _name: string, payload) => {
+                          const percent = Number(payload?.payload?.percentage ?? 0)
+                          return [`${payload?.name || ''} ${Math.round(percent)}%`, '']
+                        }}
+                        labelFormatter={() => ''}
+                        separator=""
+                        contentStyle={{ padding: '4px 6px', fontSize: '10px', opacity: 0.7 }}
+                      />
+                      <Legend
+                        align="left"
+                        layout="vertical"
+                        verticalAlign="middle"
+                        wrapperStyle={{ fontSize: 10 }}
+                        formatter={(value) => (
+                          <span style={{ color: '#ffffff' }}>{value}</span>
+                        )}
+                      />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </CardContent>
-          </Card>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              Share of total portfolio value by sector.
+            </TooltipContent>
+          </Tooltip>
 
-          <Card className="md:col-span-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Portfolio Summary</CardTitle>
+              <CardTitle className="text-sm font-medium">Volatility</CardTitle>
+              <Activity className="h-4 w-4 text-blue-300" />
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Badge>Holdings</Badge>
-                  <span className="text-sm text-muted-foreground">{portfolioData.length} assets</span>
+              {showSkeletons ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-7 w-24" />
+                  <Skeleton className="h-4 w-32" />
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">Total Value</Badge>
-                  <span className="text-sm text-muted-foreground">${Math.round(totalValue).toLocaleString()}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline">Gain/Loss</Badge>
-                  <span className={`text-sm ${totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {totalGainLoss >= 0 ? '+' : ''}${Math.round(totalGainLoss).toLocaleString()} ({totalGainLossPercent.toFixed(2)}%)
-                  </span>
-                </div>
-              </div>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-zinc-100">
+                    {(portfolioVolatility * 100).toFixed(2)}%
+                  </div>
+                  <p className="text-xs text-zinc-400">
+                    Annualized volatility from daily returns
+                  </p>
+                </>
+              )}
             </CardContent>
-          </Card>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              Standard deviation of daily returns, annualized.
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Max Drawdown</CardTitle>
+              <Activity className="h-4 w-4 text-blue-300" />
+            </CardHeader>
+            <CardContent>
+              {showSkeletons ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-7 w-24" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-zinc-100">
+                    {(maxDrawdown.drawdown * 100).toFixed(2)}%
+                  </div>
+                  <p className="text-xs text-zinc-400">
+                    {maxDrawdown.peakDate && maxDrawdown.troughDate
+                      ? `${formatDateLabel(maxDrawdown.peakDate)} → ${formatDateLabel(maxDrawdown.troughDate)}`
+                      : 'Largest peak-to-trough decline'}
+                  </p>
+                </>
+              )}
+            </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              Worst drawdown over the available history.
+            </TooltipContent>
+          </Tooltip>
+
         </div>
 
-        <Card>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Card>
           <CardHeader>
             <CardTitle>Holdings</CardTitle>
             <CardDescription>Current portfolio positions</CardDescription>
@@ -403,34 +1097,72 @@ export default function Dashboard() {
                   <TableRow>
                     <TableHead>Symbol</TableHead>
                     <TableHead>Name</TableHead>
+                    <TableHead>Sector</TableHead>
                     <TableHead className="text-right">Shares</TableHead>
                     <TableHead className="text-right">Cost Basis</TableHead>
                     <TableHead className="text-right">Current Price</TableHead>
                     <TableHead className="text-right">Value</TableHead>
-                    <TableHead className="text-right">Sector</TableHead>
+                    <TableHead className="text-right">$ Total G/L</TableHead>
+                    <TableHead className="text-right">% Total G/L</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {portfolioData.map((holding) => (
-                    <TableRow key={holding.symbol}>
-                      <TableCell className="font-medium">{holding.symbol}</TableCell>
-                      <TableCell>{holding.name}</TableCell>
-                      <TableCell className="text-right">{holding.shares}</TableCell>
-                      <TableCell className="text-right">${holding.costBasis.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">${holding.currentPrice.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">${Math.round(holding.currentPrice * holding.shares).toLocaleString()}</TableCell>
-                      <TableCell className="text-right">{holding.sector}</TableCell>
-                    </TableRow>
-                  ))}
+                  {showSkeletons ? (
+                    Array.from({ length: 6 }).map((_, index) => (
+                      <TableRow key={`holding-skeleton-${index}`}>
+                        <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-16" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-16" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-16" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-20" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-20" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-16" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    sortedHoldings.map((holding) => (
+                      (() => {
+                        const totalCost = holding.costBasis * holding.shares
+                        const totalGl = holding.value - totalCost
+                        const totalGlPercent = totalCost ? (totalGl / totalCost) * 100 : 0
+                        return (
+                      <TableRow key={holding.symbol}>
+                        <TableCell className="font-medium">{holding.symbol}</TableCell>
+                        <TableCell>{holding.name}</TableCell>
+                        <TableCell>{holding.sector}</TableCell>
+                        <TableCell className="text-right">{holding.shares}</TableCell>
+                        <TableCell className="text-right">${holding.costBasis.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">${holding.currentPrice.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(holding.value)}</TableCell>
+                        <TableCell className={`text-right ${totalGl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {totalGl >= 0 ? '+' : ''}{formatCurrency(Math.abs(totalGl))}
+                        </TableCell>
+                        <TableCell className={`text-right ${totalGlPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {totalGlPercent >= 0 ? '+' : ''}{totalGlPercent.toFixed(2)}%
+                        </TableCell>
+                      </TableRow>
+                        )
+                      })()
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>
           </CardContent>
-        </Card>
+            </Card>
+          </TooltipTrigger>
+          <TooltipContent>
+            Positions built from simulated trades and Massive prices.
+          </TooltipContent>
+        </Tooltip>
 
-        <Card>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Card>
           <CardHeader>
-            <CardTitle>Recent Transactions</CardTitle>
+            <CardTitle>Recent Transactions Activity</CardTitle>
             <CardDescription>Latest portfolio activity</CardDescription>
           </CardHeader>
           <CardContent>
@@ -443,30 +1175,48 @@ export default function Dashboard() {
                     <TableHead>Type</TableHead>
                     <TableHead className="text-right">Shares</TableHead>
                     <TableHead className="text-right">Price</TableHead>
-                    <TableHead className="text-right">Fees</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {transactions.map((tx, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell>{tx.date}</TableCell>
-                      <TableCell>{tx.symbol}</TableCell>
-                      <TableCell>
-                        <Badge variant={tx.type === 'buy' ? 'secondary' : 'destructive'}>
-                          {tx.type.toUpperCase()}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">{tx.shares}</TableCell>
-                      <TableCell className="text-right">${tx.price.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">${tx.fees.toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))}
+                  {showSkeletons ? (
+                    Array.from({ length: 6 }).map((_, index) => (
+                      <TableRow key={`txn-skeleton-${index}`}>
+                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-14" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-16" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    recentTransactions.map((tx) => (
+                      <TableRow key={tx.id}>
+                        <TableCell>{formatDateTime(tx.datetime)}</TableCell>
+                        <TableCell>{tx.symbol}</TableCell>
+                        <TableCell>
+                          <Badge variant={tx.type === 'buy' ? 'secondary' : 'destructive'}>
+                            {tx.type.toUpperCase()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">{tx.quantity}</TableCell>
+                        <TableCell className="text-right">
+                          {tx.price ? `$${tx.price.toFixed(2)}` : '—'}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>
           </CardContent>
-        </Card>
-      </div>
+            </Card>
+          </TooltipTrigger>
+          <TooltipContent>
+            Most recent trades with prices from nearest prior close.
+          </TooltipContent>
+        </Tooltip>
+        </div>
+      </TooltipProvider>
     </div>
   )
 }

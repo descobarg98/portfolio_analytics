@@ -22,9 +22,5 @@ export default function ProtectedRoute() {
     return <Navigate to={`/login?${params.toString()}`} replace />
   }
 
-  if (location.pathname !== '/onboarding' && user.profile && user.profile.onboarded === false) {
-    return <Navigate to="/onboarding" replace />
-  }
-
   return <Outlet />
 }
