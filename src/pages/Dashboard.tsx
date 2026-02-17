@@ -73,6 +73,21 @@ const formatDateTime = (value: string) => {
   return `${year}-${month}-${day} ${hours12}:${minutes} ${meridiem}`
 }
 
+const computeRangePosition = (series: { date: string; close: number }[], currentPrice: number) => {
+  if (!series.length || !currentPrice) return null
+  const latestDate = new Date(series[series.length - 1].date)
+  const cutoff = new Date(latestDate)
+  cutoff.setDate(cutoff.getDate() - 365)
+  const window = series.filter((point) => new Date(point.date) >= cutoff)
+  if (!window.length) return null
+  const closes = window.map((point) => point.close)
+  const min = Math.min(...closes)
+  const max = Math.max(...closes)
+  if (max === min) return { percent: 0, min, max }
+  const percent = ((currentPrice - min) / (max - min)) * 100
+  return { percent, min, max }
+}
+
 const buildPriceMap = (prices: { symbol: string; price: number }[]) => {
   const map = new Map<string, number>()
   for (const price of prices) {
@@ -298,9 +313,10 @@ const resolveCloseForDate = (series: { date: string; close: number }[], targetDa
 }
 
 export default function Dashboard() {
-  const [selectedPeriod, setSelectedPeriod] = useState<(typeof PERIOD_OPTIONS)[number]>('1M')
+  const [selectedPeriod, setSelectedPeriod] = useState<(typeof PERIOD_OPTIONS)[number]>('1Y')
   const [selectedPortfolio, setSelectedPortfolio] = useState<PortfolioId | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [showAllTransactions, setShowAllTransactions] = useState(false)
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
@@ -313,6 +329,14 @@ export default function Dashboard() {
     () => (selectedPortfolio ? getPortfolioInstruments(selectedPortfolio) : []),
     [selectedPortfolio],
   )
+
+  const instrumentSectorMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const instrument of instruments) {
+      map.set(instrument.symbol, instrument.sector)
+    }
+    return map
+  }, [instruments])
 
   const symbols = useMemo(() => {
     const set = new Set(instruments.map((item) => item.symbol))
@@ -363,6 +387,18 @@ export default function Dashboard() {
     [historyQuery.data],
   )
 
+  const rangePositionMap = useMemo(() => {
+    const map = new Map<string, { percent: number }>()
+    for (const [symbol, series] of historyMap.entries()) {
+      const currentPrice = latestPriceMap.get(symbol) ?? 0
+      const result = computeRangePosition(series, currentPrice)
+      if (result) {
+        map.set(symbol, { percent: result.percent })
+      }
+    }
+    return map
+  }, [historyMap, latestPriceMap])
+
   const enrichedTransactions = useMemo(() => {
     if (!selectedPortfolio) return []
     return transactions.map((tx) => {
@@ -398,7 +434,7 @@ export default function Dashboard() {
   const topHoldings = useMemo(() => {
     return [...holdings]
       .sort((a, b) => b.value - a.value)
-      .slice(0, 3)
+      .slice(0, 5)
   }, [holdings])
 
   const totalValue = holdings.reduce((sum, holding) => sum + holding.value, 0)
@@ -506,17 +542,22 @@ export default function Dashboard() {
   }, [filteredPortfolioSeries, portfolioPeriodReturn.percent, sp500Return])
 
   const riskFreeRate = 0.04
-  const sharpeRatio = computeSharpeRatio(portfolioHistory, riskFreeRate)
-  const sortinoRatio = computeSortinoRatio(portfolioHistory, riskFreeRate)
+  const sharpeRatio = computeSharpeRatio(filteredPortfolioSeries, riskFreeRate)
+  const sortinoRatio = computeSortinoRatio(filteredPortfolioSeries, riskFreeRate)
   const betaVsSp500 = computeBeta(filteredPortfolioSeries, filteredSp500Series)
   const alphaVsSp500 = computeAlpha(filteredPortfolioSeries, filteredSp500Series, riskFreeRate)
-  const portfolioVolatility = computeAnnualizedVolatility(portfolioHistory)
-  const maxDrawdown = computeMaxDrawdown(portfolioHistory)
+  const portfolioVolatility = computeAnnualizedVolatility(filteredPortfolioSeries)
+  const maxDrawdown = computeMaxDrawdown(filteredPortfolioSeries)
 
   const recentTransactions = useMemo(
     () => [...enrichedTransactions].sort((a, b) => new Date(b.datetime).getTime() - new Date(a.datetime).getTime()),
     [enrichedTransactions],
   )
+
+  const visibleTransactions = useMemo(() => {
+    if (showAllTransactions) return recentTransactions
+    return recentTransactions.slice(0, 20)
+  }, [recentTransactions, showAllTransactions])
 
   const showSkeletons = !selectedPortfolio || latestPricesQuery.isLoading || historyQuery.isLoading
   const pricingError = latestPricesQuery.error || historyQuery.error
@@ -617,7 +658,7 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <>
-                  <div className="text-2xl font-bold">{formatCurrency(totalValue)}</div>
+                  <div className="text-xl font-bold">{formatCurrency(totalValue)}</div>
                   <p className={`text-base font-semibold ${portfolioPeriodReturn.dollar >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {portfolioPeriodReturn.dollar >= 0 ? '+' : ''}{formatCurrency(Math.abs(portfolioPeriodReturn.dollar))} ({portfolioPeriodReturn.percent.toFixed(2)}%)
                   </p>
@@ -646,7 +687,7 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <>
-                  <div className={`text-2xl font-bold ${sharpeRatio >= 1 ? 'text-green-600' : sharpeRatio >= 0.5 ? 'text-yellow-600' : 'text-red-600'}`}>
+                  <div className={`text-xl font-bold ${sharpeRatio >= 1 ? 'text-green-600' : sharpeRatio >= 0.5 ? 'text-yellow-600' : 'text-red-600'}`}>
                     {sharpeRatio.toFixed(2)}
                   </div>
                   <p className="text-xs text-zinc-400">
@@ -677,7 +718,7 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <>
-                  <div className={`text-2xl font-bold ${sortinoRatio >= 1 ? 'text-green-600' : sortinoRatio >= 0.5 ? 'text-yellow-600' : 'text-red-600'}`}>
+                  <div className={`text-xl font-bold ${sortinoRatio >= 1 ? 'text-green-600' : sortinoRatio >= 0.5 ? 'text-yellow-600' : 'text-red-600'}`}>
                     {sortinoRatio.toFixed(2)}
                   </div>
                   <p className="text-xs text-zinc-400">
@@ -708,7 +749,7 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <>
-                  <div className="text-2xl font-bold text-zinc-100">
+                  <div className="text-xl font-bold text-zinc-100">
                     {betaVsSp500.toFixed(2)}
                   </div>
                   <p className="text-xs text-zinc-400">
@@ -739,7 +780,7 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <>
-                  <div className={`text-2xl font-bold ${alphaVsSp500 >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  <div className={`text-xl font-bold ${alphaVsSp500 >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {alphaVsSp500 >= 0 ? '+' : ''}{(alphaVsSp500 * 100).toFixed(2)}%
                   </div>
                   <p className="text-xs text-zinc-400">
@@ -770,11 +811,11 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <>
-                  <div className={`text-lg font-semibold ${portfolioPeriodReturn.percent >= sp500Return ? 'text-green-600' : 'text-red-600'}`}>
+                  <div className={`text-base font-semibold ${portfolioPeriodReturn.percent >= sp500Return ? 'text-green-600' : 'text-red-600'}`}>
                     {performanceMessage}
                   </div>
                   <p className="text-xs text-zinc-400">
-                    Based on the selected period return.
+                    S&P 500 Benchmark
                   </p>
                 </>
               )}
@@ -789,7 +830,7 @@ export default function Dashboard() {
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Card>
+            <Card className="-mt-2">
           <CardContent className="py-3">
             {showSkeletons ? (
               <div className="space-y-2">
@@ -800,19 +841,19 @@ export default function Dashboard() {
             ) : (
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-sm font-semibold text-zinc-100">
-                  S&P 500:{' '}
+                  S&P 500:  {' '}
                   <span className={sp500Return >= 0 ? 'text-green-600' : 'text-red-600'}>
                     {sp500Return >= 0 ? '+' : ''}{sp500Return.toFixed(2)}%
                   </span>
                 </div>
                 <div className="text-sm font-semibold text-zinc-100">
-                  NASDAQ 100:{' '}
+                  NASDAQ 100:  {' '}
                   <span className={nasdaqReturn >= 0 ? 'text-green-600' : 'text-red-600'}>
                     {nasdaqReturn >= 0 ? '+' : ''}{nasdaqReturn.toFixed(2)}%
                   </span>
                 </div>
                 <div className="text-sm font-semibold text-zinc-100">
-                  DJI:{' '}
+                  DJI:  {' '}
                   <span className={djiReturn >= 0 ? 'text-green-600' : 'text-red-600'}>
                     {djiReturn >= 0 ? '+' : ''}{djiReturn.toFixed(2)}%
                   </span>
@@ -829,12 +870,10 @@ export default function Dashboard() {
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Card>
+            <Card className="border-none -mt-4">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Portfolio Performance</CardTitle>
-              </div>
+              <div />
               <div className="flex space-x-2">
                 {PERIOD_OPTIONS.map((period) => (
                   <Button
@@ -1104,6 +1143,7 @@ export default function Dashboard() {
                     <TableHead className="text-right">Value</TableHead>
                     <TableHead className="text-right">$ Total G/L</TableHead>
                     <TableHead className="text-right">% Total G/L</TableHead>
+                    <TableHead className="text-right">52W Range</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1119,6 +1159,7 @@ export default function Dashboard() {
                         <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-20" /></TableCell>
                         <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-20" /></TableCell>
                         <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-16" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-16" /></TableCell>
                       </TableRow>
                     ))
                   ) : (
@@ -1127,6 +1168,7 @@ export default function Dashboard() {
                         const totalCost = holding.costBasis * holding.shares
                         const totalGl = holding.value - totalCost
                         const totalGlPercent = totalCost ? (totalGl / totalCost) * 100 : 0
+                        const rangePosition = rangePositionMap.get(holding.symbol)
                         return (
                       <TableRow key={holding.symbol}>
                         <TableCell className="font-medium">{holding.symbol}</TableCell>
@@ -1141,6 +1183,9 @@ export default function Dashboard() {
                         </TableCell>
                         <TableCell className={`text-right ${totalGlPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {totalGlPercent >= 0 ? '+' : ''}{totalGlPercent.toFixed(2)}%
+                        </TableCell>
+                        <TableCell className="text-right text-zinc-200">
+                          {rangePosition ? `${Math.round(rangePosition.percent)}%` : '—'}
                         </TableCell>
                       </TableRow>
                         )
@@ -1162,7 +1207,7 @@ export default function Dashboard() {
           <TooltipTrigger asChild>
             <Card>
           <CardHeader>
-            <CardTitle>Recent Transactions Activity</CardTitle>
+            <CardTitle>Transaction Activity</CardTitle>
             <CardDescription>Latest portfolio activity</CardDescription>
           </CardHeader>
           <CardContent>
@@ -1172,6 +1217,7 @@ export default function Dashboard() {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Symbol</TableHead>
+                    <TableHead>Sector</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead className="text-right">Shares</TableHead>
                     <TableHead className="text-right">Price</TableHead>
@@ -1183,16 +1229,18 @@ export default function Dashboard() {
                       <TableRow key={`txn-skeleton-${index}`}>
                         <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                         <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-14" /></TableCell>
                         <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-16" /></TableCell>
                       </TableRow>
                     ))
                   ) : (
-                    recentTransactions.map((tx) => (
+                    visibleTransactions.map((tx) => (
                       <TableRow key={tx.id}>
                         <TableCell>{formatDateTime(tx.datetime)}</TableCell>
                         <TableCell>{tx.symbol}</TableCell>
+                        <TableCell>{instrumentSectorMap.get(tx.symbol) ?? '—'}</TableCell>
                         <TableCell>
                           <Badge variant={tx.type === 'buy' ? 'secondary' : 'destructive'}>
                             {tx.type.toUpperCase()}
@@ -1207,6 +1255,13 @@ export default function Dashboard() {
                   )}
                 </TableBody>
               </Table>
+              {!showSkeletons && recentTransactions.length > 20 ? (
+                <div className="mt-4 flex justify-center">
+                  <Button variant="outline" size="sm" onClick={() => setShowAllTransactions((prev) => !prev)}>
+                    {showAllTransactions ? 'Show less' : 'See more'}
+                  </Button>
+                </div>
+              ) : null}
             </div>
           </CardContent>
             </Card>
