@@ -54,7 +54,7 @@ app.use((req, res, next) => {
 })
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok' })
+  res.json({ status: 'ok', massiveKeyPresent: Boolean(MASSIVE_API_KEY), massiveBaseUrl: MASSIVE_BASE_URL })
 })
 
 const buildAggsUrl = (symbol, startDate, endDate, limit) => {
@@ -70,6 +70,15 @@ const buildAggsUrl = (symbol, startDate, endDate, limit) => {
   url.searchParams.set('limit', String(limit ?? 120))
   url.searchParams.set('apiKey', MASSIVE_API_KEY)
   return url
+}
+
+const parseJsonResponse = async (response) => {
+  const text = await response.text()
+  try {
+    return { data: JSON.parse(text), text }
+  } catch (error) {
+    return { data: null, text }
+  }
 }
 
 app.get('/api/massive/history', async (req, res) => {
@@ -88,9 +97,15 @@ app.get('/api/massive/history', async (req, res) => {
 
     const url = buildAggsUrl(symbol, start, end, limit)
     const response = await fetch(url.toString())
-    const data = await response.json()
+    const { data, text } = await parseJsonResponse(response)
     if (!response.ok) {
-      res.status(response.status).json(data)
+      res.status(response.status).json(
+        data || { error: 'Massive API response was not JSON.', status: response.status, body: text.slice(0, 200) },
+      )
+      return
+    }
+    if (!data) {
+      res.status(502).json({ error: 'Massive API response was not JSON.', status: response.status, body: text.slice(0, 200) })
       return
     }
     res.json(data)
@@ -120,9 +135,15 @@ app.get('/api/massive/latest', async (req, res) => {
       symbols.map(async (symbol) => {
         const url = buildAggsUrl(symbol, startDate, endDate, 120)
         const response = await fetch(url.toString())
-        const data = await response.json()
+        const { data, text } = await parseJsonResponse(response)
         if (!response.ok) {
-          return { symbol, error: data }
+          return {
+            symbol,
+            error: data || { error: 'Massive API response was not JSON.', status: response.status, body: text.slice(0, 200) },
+          }
+        }
+        if (!data) {
+          return { symbol, error: { error: 'Massive API response was not JSON.', status: response.status, body: text.slice(0, 200) } }
         }
         return { symbol, data }
       }),
