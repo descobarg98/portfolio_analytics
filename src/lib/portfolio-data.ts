@@ -89,8 +89,8 @@ const ETF_UNIVERSE: Instrument[] = [
   { symbol: 'SLV', name: 'iShares Silver Trust', sector: 'ETF' },
 ]
 
-const PORTFOLIO_1_SYMBOLS = [...LARGE_CAP_UNIVERSE, ...ETF_UNIVERSE]
-const PORTFOLIO_2_SYMBOLS = [
+const PORTFOLIO_1_SYMBOLS: Instrument[] = [...LARGE_CAP_UNIVERSE, ...ETF_UNIVERSE]
+const PORTFOLIO_2_SYMBOLS: Instrument[] = [
   { symbol: 'SPY', name: 'SPDR S&P 500 ETF', sector: 'ETF' },
   { symbol: 'QQQ', name: 'Invesco QQQ Trust', sector: 'ETF' },
   { symbol: 'IVV', name: 'iShares Core S&P 500 ETF', sector: 'ETF' },

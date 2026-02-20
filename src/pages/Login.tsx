@@ -11,7 +11,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-black p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="flex items-center">
           <img src={`${import.meta.env.BASE_URL}sharpeful-logo.png`} alt="Sharpeful" className="h-12 w-auto mb-2" />
