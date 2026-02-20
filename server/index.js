@@ -31,11 +31,19 @@ loadEnvFile(ENV_PATH)
 
 const MASSIVE_API_KEY = process.env.MASSIVE_API_KEY
 const MASSIVE_BASE_URL = process.env.MASSIVE_API_BASE_URL || 'https://api.massive.com/v2'
-const PORT = Number(process.env.MASSIVE_SERVER_PORT || 8000)
-const APP_ORIGIN = process.env.APP_ORIGIN || 'http://localhost:5173'
+const PORT = Number(process.env.MASSIVE_SERVER_PORT || process.env.PORT || 8000)
+const APP_ORIGINS = (process.env.APP_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean)
 
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', APP_ORIGIN)
+  const origin = req.headers.origin
+  if (origin && APP_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+  } else if (!origin && APP_ORIGINS.length > 0) {
+    res.setHeader('Access-Control-Allow-Origin', APP_ORIGINS[0])
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
   if (req.method === 'OPTIONS') {

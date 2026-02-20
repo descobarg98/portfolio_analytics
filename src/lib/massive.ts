@@ -16,6 +16,8 @@ type MassiveAggsResponse = {
   }>
 }
 
+const apiBase = import.meta.env.VITE_API_BASE || window.location.origin
+
 const fetchMassive = async <T>(url: URL) => {
   const response = await fetch(url.toString())
   const data = await response.json()
@@ -37,7 +39,7 @@ const extractHistory = (payload: MassiveAggsResponse): MassivePricePoint[] => {
 }
 
 export const fetchLatestPrices = async (symbols: string[]) => {
-  const url = new URL('/api/massive/latest', window.location.origin)
+  const url = new URL('/api/massive/latest', apiBase)
   url.searchParams.set('symbols', symbols.join(','))
   const payload = await fetchMassive<{ results: Array<{ symbol: string; data?: MassiveAggsResponse }> }>(url)
   const results = payload.results.map((entry) => {
@@ -51,7 +53,7 @@ export const fetchLatestPrices = async (symbols: string[]) => {
 }
 
 export const fetchHistoricalPrices = async (symbol: string, startDate: string, endDate: string) => {
-  const url = new URL('/api/massive/history', window.location.origin)
+  const url = new URL('/api/massive/history', apiBase)
   url.searchParams.set('symbol', symbol)
   url.searchParams.set('start', startDate)
   url.searchParams.set('end', endDate)
