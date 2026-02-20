@@ -19,6 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VITE_BASE_PATH: "/"
+      VITE_AUTH0_DOMAIN: ${{ secrets.VITE_AUTH0_DOMAIN }}
+      VITE_AUTH0_CLIENT_ID: ${{ secrets.VITE_AUTH0_CLIENT_ID }}
+      VITE_AUTH0_AUDIENCE: ${{ secrets.VITE_AUTH0_AUDIENCE }}
+      VITE_AUTH0_REDIRECT_URI: ${{ secrets.VITE_AUTH0_REDIRECT_URI }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
