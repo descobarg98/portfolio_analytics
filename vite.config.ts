@@ -2,8 +2,10 @@ import path from "path"
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 
+const basePath = process.env.VITE_BASE_PATH || '/'
+
 export default defineConfig({
-  base: process.env.GITHUB_PAGES === 'true' ? '/portfolio_analytics/' : '/',
+  base: basePath,
   plugins: [react()],
   server: {
     proxy: {
