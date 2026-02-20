@@ -441,7 +441,6 @@ export default function Dashboard() {
   }, [holdings])
 
   const totalValue = holdings.reduce((sum, holding) => sum + holding.value, 0)
-  const totalCost = holdings.reduce((sum, holding) => sum + holding.shares * holding.costBasis, 0)
 
   const sectorAllocation = holdings.reduce((acc: Record<string, number>, holding) => {
     acc[holding.sector] = (acc[holding.sector] || 0) + holding.value

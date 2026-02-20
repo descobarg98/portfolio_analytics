@@ -752,11 +752,11 @@ const ROTH_IRA_TRANSACTIONS: PortfolioTransaction[] = [
   },
 ]
 
-export const getPortfolioInstruments = (portfolioId: PortfolioId) => {
+export const getPortfolioInstruments = (portfolioId: PortfolioId): Instrument[] => {
   if (portfolioId === 'portfolio-1') return PORTFOLIO_1_SYMBOLS
   if (portfolioId === 'portfolio-2') return PORTFOLIO_2_SYMBOLS
   if (portfolioId === 'portfolio-4') return resolveInstruments(ROTH_IRA_SYMBOLS)
-  return [{ symbol: 'QQQ', name: 'Invesco QQQ Trust', sector: 'ETF' }]
+  return [{ symbol: 'QQQ', name: 'Invesco QQQ Trust', sector: 'ETF' } as Instrument]
 }
 
 export const getPortfolioTransactions = (portfolioId: PortfolioId): PortfolioTransaction[] => {
