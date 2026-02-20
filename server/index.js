@@ -53,6 +53,10 @@ app.use((req, res, next) => {
   next()
 })
 
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' })
+})
+
 const buildAggsUrl = (symbol, startDate, endDate, limit) => {
   if (!MASSIVE_API_KEY) {
     throw new Error('Missing MASSIVE_API_KEY.')
