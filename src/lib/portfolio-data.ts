@@ -177,7 +177,7 @@ const ALL_INSTRUMENTS: Instrument[] = [
 const instrumentMap = new Map(ALL_INSTRUMENTS.map((instrument) => [instrument.symbol, instrument]))
 
 const resolveInstruments = (symbols: string[]): Instrument[] =>
-  symbols.map((symbol) => instrumentMap.get(symbol) || { symbol, name: symbol, sector: 'Other' })
+  symbols.map((symbol) => instrumentMap.get(symbol) || ({ symbol, name: symbol, sector: 'Other' as const }))
 
 const ROTH_IRA_SYMBOLS = ['IVV', 'QQQ', 'HYG', 'KRE', 'VIXY', 'XOP', 'SHY', 'IWM', 'UGA', 'IBIT', 'VUG', 'DEM', 'IAU', 'SLV']
 
@@ -759,7 +759,7 @@ export const getPortfolioInstruments = (portfolioId: PortfolioId) => {
   return [{ symbol: 'QQQ', name: 'Invesco QQQ Trust', sector: 'ETF' }]
 }
 
-export const getPortfolioTransactions = (portfolioId: PortfolioId) => {
+export const getPortfolioTransactions = (portfolioId: PortfolioId): PortfolioTransaction[] => {
   if (portfolioId === 'portfolio-1') {
     return generateTransactions(
       PORTFOLIO_1_SYMBOLS,

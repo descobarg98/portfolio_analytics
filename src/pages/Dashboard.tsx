@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { DollarSign, Wallet, Activity } from 'lucide-react'
-import { XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart as RechartsPieChart, Cell, AreaChart, Area, Pie, Legend, type AxisDomain } from 'recharts'
+import { XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart as RechartsPieChart, Cell, AreaChart, Area, Pie, Legend } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,11 +20,13 @@ import {
   getPortfolioTransactions,
   type PortfolioId,
   type PortfolioTransaction,
+  type Instrument,
 } from '@/lib/portfolio-data'
 import { fetchHistoricalPrices, fetchLatestPrices } from '@/lib/massive'
 import '../App.css'
 
 const COLORS = ['#0B1F3A', '#12325C', '#1A477E', '#235DA0', '#2D74C2', '#3E8BE4', '#5AA1EE', '#7AB6F5', '#9CC9FA', '#B9DBFD']
+type YAxisDomain = [number, number] | ['auto', 'auto']
 
 const PERIOD_OPTIONS = ['1W', '1M', '3M', '6M', '1Y', '3Y', 'YTD'] as const
 const PERIOD_DAYS: Record<(typeof PERIOD_OPTIONS)[number], number> = {
@@ -326,7 +328,7 @@ export default function Dashboard() {
     [selectedPortfolio],
   )
 
-  const instruments = useMemo(
+  const instruments = useMemo<Instrument[]>(
     () => (selectedPortfolio ? getPortfolioInstruments(selectedPortfolio) : []),
     [selectedPortfolio],
   )
@@ -440,7 +442,6 @@ export default function Dashboard() {
 
   const totalValue = holdings.reduce((sum, holding) => sum + holding.value, 0)
   const totalCost = holdings.reduce((sum, holding) => sum + holding.shares * holding.costBasis, 0)
-  const totalGainLoss = totalValue - totalCost
 
   const sectorAllocation = holdings.reduce((acc: Record<string, number>, holding) => {
     acc[holding.sector] = (acc[holding.sector] || 0) + holding.value
@@ -487,7 +488,7 @@ export default function Dashboard() {
     [portfolioHistory, selectedPeriod],
   )
 
-  const yAxisDomain = useMemo<AxisDomain>(() => {
+  const yAxisDomain = useMemo<YAxisDomain>(() => {
     if (!filteredPortfolioSeries.length) return ['auto', 'auto']
     const values = filteredPortfolioSeries.map((point) => point.value)
     const min = Math.min(...values)
