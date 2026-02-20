@@ -176,7 +176,7 @@ const ALL_INSTRUMENTS: Instrument[] = [
 
 const instrumentMap = new Map(ALL_INSTRUMENTS.map((instrument) => [instrument.symbol, instrument]))
 
-const resolveInstruments = (symbols: string[]) =>
+const resolveInstruments = (symbols: string[]): Instrument[] =>
   symbols.map((symbol) => instrumentMap.get(symbol) || { symbol, name: symbol, sector: 'Other' })
 
 const ROTH_IRA_SYMBOLS = ['IVV', 'QQQ', 'HYG', 'KRE', 'VIXY', 'XOP', 'SHY', 'IWM', 'UGA', 'IBIT', 'VUG', 'DEM', 'IAU', 'SLV']

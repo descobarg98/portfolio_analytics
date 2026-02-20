@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { DollarSign, Wallet, Activity } from 'lucide-react'
-import { XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart as RechartsPieChart, Cell, AreaChart, Area, Pie, Legend } from 'recharts'
+import { XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart as RechartsPieChart, Cell, AreaChart, Area, Pie, Legend, type AxisDomain } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,7 @@ import {
   getPortfolioInstruments,
   getPortfolioTransactions,
   type PortfolioId,
+  type PortfolioTransaction,
 } from '@/lib/portfolio-data'
 import { fetchHistoricalPrices, fetchLatestPrices } from '@/lib/massive'
 import '../App.css'
@@ -320,7 +321,7 @@ export default function Dashboard() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
-  const transactions = useMemo(
+  const transactions = useMemo<PortfolioTransaction[]>(
     () => (selectedPortfolio ? getPortfolioTransactions(selectedPortfolio) : []),
     [selectedPortfolio],
   )
@@ -399,7 +400,7 @@ export default function Dashboard() {
     return map
   }, [historyMap, latestPriceMap])
 
-  const enrichedTransactions = useMemo(() => {
+  const enrichedTransactions = useMemo<PortfolioTransaction[]>(() => {
     if (!selectedPortfolio) return []
     return transactions.map((tx) => {
       const series = historyMap.get(tx.symbol) || []
@@ -440,7 +441,6 @@ export default function Dashboard() {
   const totalValue = holdings.reduce((sum, holding) => sum + holding.value, 0)
   const totalCost = holdings.reduce((sum, holding) => sum + holding.shares * holding.costBasis, 0)
   const totalGainLoss = totalValue - totalCost
-  const totalGainLossPercent = totalCost ? (totalGainLoss / totalCost) * 100 : 0
 
   const sectorAllocation = holdings.reduce((acc: Record<string, number>, holding) => {
     acc[holding.sector] = (acc[holding.sector] || 0) + holding.value
@@ -487,13 +487,13 @@ export default function Dashboard() {
     [portfolioHistory, selectedPeriod],
   )
 
-  const yAxisDomain = useMemo(() => {
-    if (!filteredPortfolioSeries.length) return ['auto', 'auto'] as const
+  const yAxisDomain = useMemo<AxisDomain>(() => {
+    if (!filteredPortfolioSeries.length) return ['auto', 'auto']
     const values = filteredPortfolioSeries.map((point) => point.value)
     const min = Math.min(...values)
     const max = Math.max(...values)
     const padding = (max - min) * 0.1
-    return [Math.max(0, min - padding), max + padding] as const
+    return [Math.max(0, min - padding), max + padding]
   }, [filteredPortfolioSeries])
 
   const xAxisTicks = useMemo(() => {

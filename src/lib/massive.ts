@@ -36,14 +36,6 @@ const extractHistory = (payload: MassiveAggsResponse): MassivePricePoint[] => {
     .filter((item) => item.date && Number.isFinite(item.close))
 }
 
-const shiftDate = (date: Date, days: number) => {
-  const next = new Date(date)
-  next.setDate(next.getDate() + days)
-  return next
-}
-
-const toIsoDate = (date: Date) => date.toISOString().slice(0, 10)
-
 export const fetchLatestPrices = async (symbols: string[]) => {
   const url = new URL('/api/massive/latest', window.location.origin)
   url.searchParams.set('symbols', symbols.join(','))
